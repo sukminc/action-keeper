@@ -20,57 +20,203 @@ Planned features by phase:
 - DB: Postgres
 - Local Dev: Docker Compose monorepo
 
-## Repo Structure
-```text
-action-keeper/
+---
+## Repository Structure
+
+This repository is a lightweight monorepo with a clear separation between **backend domain logic** and **frontend mobile-first UI**.  
+It is designed for **TDD-first development**, SQLite-safe testing, and future PostgreSQL production deployment.
+
+### Full tree
+
+```bash
+tree -a -I 'node_modules|.next|__pycache__|.pytest_cache|.venv|.git'
+.
+├── .env.example
+├── .gitignore
+├── .vscode
+│   └── settings.json
+├── README.md
+├── backend
+│   ├── Dockerfile
+│   ├── app
+│   │   ├── __init__.py
+│   │   ├── api
+│   │   │   └── v1
+│   │   │       ├── __init__.py
+│   │   │       └── health.py
+│   │   ├── db
+│   │   │   ├── __init__.py
+│   │   │   ├── base.py
+│   │   │   ├── models
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── agreement.py
+│   │   │   │   └── event.py
+│   │   │   ├── session.py
+│   │   │   └── types.py
+│   │   ├── main.py
+│   │   ├── repositories
+│   │   │   ├── __init__.py
+│   │   │   ├── agreements_repo.py
+│   │   │   └── events_repo.py
+│   │   └── schemas
+│   │       ├── __init__.py
+│   │       └── agreement.py
+│   ├── pytest.ini
+│   ├── requirements.txt
+│   └── tests
+│       ├── __init__.py
+│       ├── conftest.py
+│       ├── test_agreements_repo.py
+│       ├── test_events_repo.py
+│       └── test_health.py
 ├── docker-compose.yml
-├── backend/         # FastAPI
-└── frontend/        # Next.js (mobile web)
+└── frontend
+    ├── Dockerfile
+    ├── next-env.d.ts
+    ├── next.config.js
+    ├── package-lock.json
+    ├── package.json
+    ├── src
+    │   └── app
+    │       ├── layout.tsx
+    │       └── page.tsx
+    └── tsconfig.json
+```
 
-Local Setup
+### Directory responsibilities
 
-1) Environment
+**Repo root**
+- `.env.example`: environment variable template
+- `docker-compose.yml`: local orchestration for backend + frontend
+- `.vscode/`: editor configuration for consistent linting and testing
 
-Copy env file:
+**Backend (`backend/`)**
+- `app/main.py`: FastAPI application entrypoint
+- `app/api/v1/`: versioned HTTP endpoints
+- `app/schemas/`: Pydantic request/response contracts
+- `app/repositories/`: persistence layer (DB access only, no business rules)
+- `app/db/`: database configuration and SQLAlchemy setup
+  - `base.py`: Declarative Base
+  - `types.py`: dialect-safe types (SQLite tests / Postgres prod)
+  - `models/`: ORM table definitions (single source of truth)
+- `tests/`: pytest suite (SQLite in-memory)
+- `requirements.txt`: backend dependencies
 
-cp .env.example .env
+**Frontend (`frontend/`)**
+- `src/app/`: Next.js App Router
+- `layout.tsx`: root layout
+- `page.tsx`: landing page
+- `Dockerfile`: frontend container build
 
-Set NEXT_PUBLIC_API_URL in .env:
-	•	Desktop: http://localhost:8000
-	•	Phone testing: http://<YOUR_LAN_IP>:8000
+This structure enforces strict separation between API, persistence, and UI, and supports incremental TDD-driven expansion (payments, trip planner, generic P2P agreements).
 
-2) Run the stack
+---
 
-From repo root:
+## Roadmap: Parts 1–10 (TDD-Gated)
 
-docker compose up --build
+Each part must pass **unit tests → quick QA → integration tests** before moving forward.
 
-3) Quick QA
+### Part 1 — Project Foundation (Baseline)
+- Repository structure (monorepo)
+- Docker Compose (frontend, backend, DB)
+- Health check endpoint (`/api/v1/health`)
+- CI-ready test setup (pytest, basic fixtures)
 
-API health:
+**Outcome:** System boots locally and is observable.
 
-curl http://localhost:8000/api/v1/health
-# {"status":"ok"}
+---
 
-Frontend:
-	•	http://localhost:3000
-	•	From phone (same Wi-Fi): http://<YOUR_LAN_IP>:3000
+### Part 2 — Core Domain Models & Repositories
+- Agreement domain model
+- Event (audit log) domain model
+- Repository layer (CRUD, append-only events)
+- SQLite-safe types for testing, Postgres-ready for prod
 
-TDD Workflow (10 Parts)
+**Outcome:** Domain persistence works and is fully unit-tested.
 
-We build in 10 parts with a strict gate:
-	1.	Write unit tests
-	2.	Implement until green
-	3.	Quick QA (manual)
-	4.	Integration test gate
-	5.	Move to next part
+---
 
-Current Part:
-	•	Part 1: Repo + Compose + Health endpoints (baseline)
+### Part 3 — Service Layer (Business Rules)
+- Agreement creation service
+- Default rules (status, versions, timestamps)
+- Event emission on state changes
+- Validation beyond schemas (domain-level)
 
-Development Notes
-	•	This project is intended to be scalable:
-	•	stateless API
-	•	durable storage for artifacts (later S3)
-	•	event/audit logging (append-only)
-	•	idempotent payment webhooks (Stripe)
+**Outcome:** Business logic isolated and testable.
+
+---
+
+### Part 4 — API Contracts (Agreements)
+- Create agreement endpoint
+- List / retrieve agreement endpoints
+- Request/response schemas stabilized
+- Error handling + HTTP semantics
+
+**Outcome:** Frontend can create and read agreements via API.
+
+---
+
+### Part 5 — Tamper-Evident Receipt
+- Deterministic agreement hashing
+- Hash persistence + verification logic
+- Public verify endpoint (read-only)
+- QR payload structure defined
+
+**Outcome:** Agreements are cryptographically verifiable.
+
+---
+
+### Part 6 — PDF Artifact Generation
+- Agreement → PDF rendering
+- Embed hash + verification URL
+- Deterministic layout for consistency
+- Store artifact metadata
+
+**Outcome:** Shareable, receipt-like contract artifact exists.
+
+---
+
+### Part 7 — Payments (Revenue MVP)
+- Stripe Checkout integration
+- Paid contract generation gate
+- Webhook handling (idempotent)
+- Payment → agreement linkage
+
+**Outcome:** App generates real revenue.
+
+---
+
+### Part 8 — Frontend Contract Builder (Mobile-First)
+- Agreement input flow (mobile UX)
+- Payment flow integration
+- Contract list / vault view
+- QR scan / verify entry points
+
+**Outcome:** End-to-end user flow is usable on phone.
+
+---
+
+### Part 9 — Audit, Hardening, and Ops
+- Event timeline view (per agreement)
+- Rate limiting & basic auth hardening
+- Structured logging
+- Config separation (dev / prod)
+
+**Outcome:** Production-readiness baseline.
+
+---
+
+### Part 10 — Expansion Hooks
+- Trip Planner domain scaffolding
+- Affiliate link placeholders
+- Generic “agreement” abstraction (non-poker reuse)
+- Migration readiness (Alembic)
+
+**Outcome:** Platform is extensible beyond poker staking.
+
+---
+
+**Monetization Checkpoint:**  
+Revenue must be observable by **Part 7**.  
+All later parts must not break paid contract generation.
+---
