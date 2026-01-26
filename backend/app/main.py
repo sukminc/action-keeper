@@ -1,6 +1,6 @@
 from fastapi import FastAPI
-from app.api.v1.health import router as health_router
 
-app = FastAPI(title="ActionKeeper API", version="0.1.0")
+from app.api.v1 import router as v1_router
 
-app.include_router(health_router, prefix="/api/v1", tags=["system"])
+app = FastAPI()
+app.include_router(v1_router, prefix="/api")

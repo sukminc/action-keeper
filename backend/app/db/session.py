@@ -1,17 +1,30 @@
-import os
+from __future__ import annotations
+
+from collections.abc import Generator
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "sqlite+pysqlite:///:memory:",
+# SQLite 메모리/로컬 테스트와 분리하려면 환경변수로 확장 가능
+DATABASE_URL = "sqlite+pysqlite:///./app.db"
+
+engine = create_engine(
+    DATABASE_URL,
+    future=True,
+    connect_args={"check_same_thread": False},
 )
 
-engine = create_engine(DATABASE_URL, future=True)
 SessionLocal = sessionmaker(
     bind=engine,
     autoflush=False,
     autocommit=False,
     future=True,
 )
+
+
+def get_db() -> Generator[Session, None, None]:
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
