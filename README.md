@@ -43,6 +43,7 @@ tree -a -I 'node_modules|.next|__pycache__|.pytest_cache|.venv|.git'
 │   │   ├── api
 │   │   │   └── v1
 │   │   │       ├── __init__.py
+│   │   │       ├── agreements.py
 │   │   │       └── health.py
 │   │   ├── db
 │   │   │   ├── __init__.py
@@ -58,15 +59,21 @@ tree -a -I 'node_modules|.next|__pycache__|.pytest_cache|.venv|.git'
 │   │   │   ├── __init__.py
 │   │   │   ├── agreements_repo.py
 │   │   │   └── events_repo.py
-│   │   └── schemas
+│   │   ├── schemas
+│   │   │   ├── __init__.py
+│   │   │   └── agreement.py
+│   │   └── services
 │   │       ├── __init__.py
-│   │       └── agreement.py
+│   │       └── agreements_service.py
+│   ├── app.db
 │   ├── pytest.ini
 │   ├── requirements.txt
 │   └── tests
 │       ├── __init__.py
 │       ├── conftest.py
+│       ├── test_agreements_api.py
 │       ├── test_agreements_repo.py
+│       ├── test_agreements_service.py
 │       ├── test_events_repo.py
 │       └── test_health.py
 ├── docker-compose.yml
@@ -95,6 +102,7 @@ tree -a -I 'node_modules|.next|__pycache__|.pytest_cache|.venv|.git'
 - `app/api/v1/`: versioned HTTP endpoints
 - `app/schemas/`: Pydantic request/response contracts
 - `app/repositories/`: persistence layer (DB access only, no business rules)
+- `app/services/`: service layer (business rules; orchestrates repositories)
 - `app/db/`: database configuration and SQLAlchemy setup
   - `base.py`: Declarative Base
   - `types.py`: dialect-safe types (SQLite tests / Postgres prod)
@@ -112,11 +120,31 @@ This structure enforces strict separation between API, persistence, and UI, and 
 
 ---
 
+## Current Progress
+
+**Status as of today:**
+- **Parts 1–4:** Completed (tests passing).
+- **Part 5 (Tamper-Evident Receipt):** Not implemented yet.
+
+**What is already working:**
+- FastAPI app boots and routes are registered (`/api/v1/health`, `/api/v1/agreements`).
+- Domain models + repositories + service layer are in place.
+- API endpoints for agreements (create/get/list) are covered by tests.
+- Docker Compose can bring up Postgres and the app can connect via `DATABASE_URL`.
+
+**What is still required to claim Part 5 complete:**
+- Deterministic agreement hashing (canonical JSON serialization + stable ordering).
+- Persist `hash` (and optionally `hash_version`) on `agreements`.
+- Public verification endpoint (e.g., `GET /api/v1/agreements/{id}/verify` or `GET /api/v1/verify?hash=...`).
+- QR payload definition (verification URL + hash) and a minimal contract for the frontend.
+
+---
+
 ## Roadmap: Parts 1–10 (TDD-Gated)
 
 Each part must pass **unit tests → quick QA → integration tests** before moving forward.
 
-### Part 1 — Project Foundation (Baseline)
+### Part 1 — Project Foundation (Baseline) ✅
 - Repository structure (monorepo)
 - Docker Compose (frontend, backend, DB)
 - Health check endpoint (`/api/v1/health`)
@@ -126,7 +154,7 @@ Each part must pass **unit tests → quick QA → integration tests** before mov
 
 ---
 
-### Part 2 — Core Domain Models & Repositories
+### Part 2 — Core Domain Models & Repositories ✅
 - Agreement domain model
 - Event (audit log) domain model
 - Repository layer (CRUD, append-only events)
@@ -136,7 +164,7 @@ Each part must pass **unit tests → quick QA → integration tests** before mov
 
 ---
 
-### Part 3 — Service Layer (Business Rules)
+### Part 3 — Service Layer (Business Rules) ✅
 - Agreement creation service
 - Default rules (status, versions, timestamps)
 - Event emission on state changes
@@ -146,7 +174,7 @@ Each part must pass **unit tests → quick QA → integration tests** before mov
 
 ---
 
-### Part 4 — API Contracts (Agreements)
+### Part 4 — API Contracts (Agreements) ✅
 - Create agreement endpoint
 - List / retrieve agreement endpoints
 - Request/response schemas stabilized
@@ -156,7 +184,7 @@ Each part must pass **unit tests → quick QA → integration tests** before mov
 
 ---
 
-### Part 5 — Tamper-Evident Receipt
+### Part 5 — Tamper-Evident Receipt (Next) ⏳
 - Deterministic agreement hashing
 - Hash persistence + verification logic
 - Public verify endpoint (read-only)
