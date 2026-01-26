@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: password
       POSTGRES_DB: action_keeper
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -30,7 +30,7 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://admin:password@db:5432/action_keeper
+      DATABASE_URL: postgresql+psycopg://admin:password@db:5432/action_keeper
 
   frontend:
     build: ./frontend

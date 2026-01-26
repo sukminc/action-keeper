@@ -1,17 +1,18 @@
-from __future__ import annotations
-
+import os
 from collections.abc import Generator
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-# SQLite 메모리/로컬 테스트와 분리하려면 환경변수로 확장 가능
-DATABASE_URL = "sqlite+pysqlite:///./app.db"
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "sqlite+pysqlite:///:memory:",
+)
 
 engine = create_engine(
     DATABASE_URL,
     future=True,
-    connect_args={"check_same_thread": False},
+    pool_pre_ping=True,
 )
 
 SessionLocal = sessionmaker(
