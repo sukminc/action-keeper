@@ -17,6 +17,7 @@ class AgreementsRepo:
             terms_version=data.terms_version,
             terms=data.terms,
             status="draft",
+            payment_id=data.payment_id,
         )
         self.session.add(agreement)
         self.session.commit()

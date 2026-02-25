@@ -12,3 +12,5 @@ def init_models() -> None:
     # noqa: F401 is intentional; import triggers model registration
     from app.db.models import agreement  # noqa: F401
     from app.db.models import event  # noqa: F401
+    from app.db.models import artifact  # noqa: F401
+    from app.db.models import payment  # noqa: F401

@@ -1,4 +1,7 @@
 from collections.abc import Generator
+import os
+import shutil
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -10,9 +13,17 @@ from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
 
+ARTIFACTS_DIR = Path("artifacts-test")
+os.environ.setdefault("ARTIFACTS_DIR", str(ARTIFACTS_DIR))
+os.environ.setdefault("VERIFY_BASE_URL", "http://localhost:8000")
+os.environ.setdefault("STRIPE_WEBHOOK_SECRET", "test-secret")
+
 
 @pytest.fixture()
 def db_session() -> Generator[Session, None, None]:
+    if ARTIFACTS_DIR.exists():
+        shutil.rmtree(ARTIFACTS_DIR)
+    ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
     # Each test gets its own in-memory DB.
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
@@ -35,6 +46,8 @@ def db_session() -> Generator[Session, None, None]:
     finally:
         session.close()
         engine.dispose()
+        if ARTIFACTS_DIR.exists():
+            shutil.rmtree(ARTIFACTS_DIR)
 
 
 @pytest.fixture()

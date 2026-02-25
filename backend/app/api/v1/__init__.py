@@ -1,8 +1,9 @@
 from fastapi import APIRouter
-from app.api.v1 import health, agreements, verification
+from app.api.v1 import health, agreements, verification, payments
 
 router = APIRouter(prefix="/api/v1")
 
 router.include_router(health.router)
 router.include_router(agreements.router)
 router.include_router(verification.router)
+router.include_router(payments.router)

@@ -20,6 +20,17 @@ Planned features by phase:
 - DB: Postgres
 - Local Dev: Docker Compose monorepo
 
+## Running Locally
+1. `cp .env.example .env` and set:
+   - `NEXT_PUBLIC_API_URL=http://localhost:8000`
+   - `VERIFY_BASE_URL=http://localhost:8000`
+   - `STRIPE_WEBHOOK_SECRET=<random-test-secret>`
+2. (Optional) override artifact output via `ARTIFACTS_DIR=artifacts`.
+3. `docker compose up --build db backend frontend`
+4. Open http://localhost:3000 for the UI and hit http://localhost:8000/api/v1/health to confirm the API.
+5. Simulate Stripe Checkout via `POST /api/v1/payments/checkout` and complete it by POSTing to `/api/v1/payments/webhook` with the header `X-Webhook-Secret`.
+6. Create agreements by POSTing to `/api/v1/agreements` with the paid `payment_id`, then download the deterministic PDF at `/api/v1/agreements/{id}/artifact`.
+
 ---
 ## Repository Structure
 
@@ -123,20 +134,14 @@ This structure enforces strict separation between API, persistence, and UI, and 
 ## Current Progress
 
 **Status as of today:**
-- **Parts 1–4:** Completed (tests passing).
-- **Part 5 (Tamper-Evident Receipt):** Not implemented yet.
+- **Parts 1–7:** Completed (tests passing).
+- Parts 8–10 remain on the roadmap.
 
 **What is already working:**
-- FastAPI app boots and routes are registered (`/api/v1/health`, `/api/v1/agreements`).
-- Domain models + repositories + service layer are in place.
-- API endpoints for agreements (create/get/list) are covered by tests.
+- FastAPI app boots and routes are registered (`/api/v1/health`, `/api/v1/agreements`, `/api/v1/payments`, `/api/v1/verify`).
+- Domain models + repositories + service layer cover agreements, payment intents, and artifact metadata.
+- Agreement creation now enforces a paid `payment_id`, hashes every contract, and stores deterministic PDF receipts with QR-ready verification URLs.
 - Docker Compose can bring up Postgres and the app can connect via `DATABASE_URL`.
-
-**What is still required to claim Part 5 complete:**
-- Deterministic agreement hashing (canonical JSON serialization + stable ordering).
-- Persist `hash` (and optionally `hash_version`) on `agreements`.
-- Public verification endpoint (e.g., `GET /api/v1/agreements/{id}/verify` or `GET /api/v1/verify?hash=...`).
-- QR payload definition (verification URL + hash) and a minimal contract for the frontend.
 
 ---
 
@@ -184,7 +189,7 @@ Each part must pass **unit tests → quick QA → integration tests** before mov
 
 ---
 
-### Part 5 — Tamper-Evident Receipt (Next) ⏳
+### Part 5 — Tamper-Evident Receipt ✅
 - Deterministic agreement hashing
 - Hash persistence + verification logic
 - Public verify endpoint (read-only)
@@ -194,21 +199,21 @@ Each part must pass **unit tests → quick QA → integration tests** before mov
 
 ---
 
-### Part 6 — PDF Artifact Generation
+### Part 6 — PDF Artifact Generation ✅
 - Agreement → PDF rendering
 - Embed hash + verification URL
 - Deterministic layout for consistency
-- Store artifact metadata
+- Store artifact metadata + download endpoint
 
 **Outcome:** Shareable, receipt-like contract artifact exists.
 
 ---
 
-### Part 7 — Payments (Revenue MVP)
-- Stripe Checkout integration
-- Paid contract generation gate
-- Webhook handling (idempotent)
-- Payment → agreement linkage
+### Part 7 — Payments (Revenue MVP) ✅
+- Stripe-style Checkout session scaffolding
+- Paid contract generation gate enforced by `payment_id`
+- Webhook handling (idempotent secret validation)
+- Payment → agreement linkage surfaced via APIs
 
 **Outcome:** App generates real revenue.
 

@@ -1,5 +1,7 @@
 import uuid
-from sqlalchemy import DateTime, JSON, String, func, Index
+from datetime import datetime
+
+from sqlalchemy import JSON, DateTime, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -30,17 +32,24 @@ class Agreement(Base):
         default="draft"
     )
 
-    # 🆕 Tamper-evident receipt (이 두 줄 추가)
+    payment_id: Mapped[str | None] = mapped_column(
+        String(36),
+        nullable=True,
+        index=True,
+    )
+
     hash: Mapped[str | None] = mapped_column(
-        String(64), nullable=True, index=True
-        )
+        String(64),
+        nullable=True,
+        index=True,
+    )
     hash_version: Mapped[str | None] = mapped_column(
         String(10),
         nullable=True,
-        default='v1'
-        )
+        default="v1"
+    )
 
-    created_at: Mapped[str] = mapped_column(
+    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
@@ -49,8 +58,8 @@ class Agreement(Base):
     def get_hashable_data(self):
         """Extract fields for hash computation."""
         return {
-            'agreement_type': self.agreement_type,
-            'terms_version': self.terms_version,
-            'terms': self.terms,
-            'status': self.status,
+            "agreement_type": self.agreement_type,
+            "terms_version": self.terms_version,
+            "terms": self.terms,
+            "status": self.status,
         }

@@ -11,7 +11,8 @@ def test_append_event_creates_row(db_session):
         AgreementCreate(
             terms_version="v1_poker",
             terms={"buy_in": 1000},
-            agreement_type=None)
+            agreement_type=None,
+            payment_id="test-payment-events")
     )
 
     evt = events.append(
@@ -34,7 +35,8 @@ def test_list_events_for_agreement(db_session):
         AgreementCreate(
             terms_version="v1_poker",
             terms={"buy_in": 1000},
-            agreement_type=None)
+            agreement_type=None,
+            payment_id="test-payment-events-2")
     )
 
     events.append(agreement.id, "CREATED", {"n": 1})

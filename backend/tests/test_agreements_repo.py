@@ -8,7 +8,8 @@ def test_create_agreement_persists_defaults(db_session):
     payload = AgreementCreate(
         terms_version="v1_poker",
         terms={"buy_in": 1000, "markup": 1.2, "stake_pct": 10},
-        agreement_type=None,  # should default to poker_staking
+        agreement_type=None,
+        payment_id="test-payment",
     )
     created = repo.create(payload)
 
@@ -26,13 +27,15 @@ def test_list_agreements_returns_created(db_session):
         AgreementCreate(
             terms_version="v1_poker",
             terms={"buy_in": 500},
-            agreement_type=None)
+            agreement_type=None,
+            payment_id="test-payment-1")
     )
     a2 = repo.create(
         AgreementCreate(
             terms_version="v1_poker",
             terms={"buy_in": 1000},
-            agreement_type="poker_staking")
+            agreement_type="poker_staking",
+            payment_id="test-payment-2")
     )
 
     results = repo.list(limit=10, offset=0)
