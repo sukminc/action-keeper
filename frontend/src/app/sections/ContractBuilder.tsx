@@ -5,14 +5,12 @@ import { useMemo, useState } from "react";
 const initialTerms = {
   stake_pct: "",
   buy_in_amount: "",
-  bullet_cap: "1",
+  markup: "1.0",
   payout_basis: "gross_payout",
   event_date: "",
-  due_date: "",
   party_a_label: "",
   party_b_label: "",
   notes: "",
-  funds_received_at: "",
 };
 
 const payoutBasisLabels: Record<string, string> = {
@@ -22,174 +20,120 @@ const payoutBasisLabels: Record<string, string> = {
 };
 
 export default function ContractBuilder() {
-  const [paymentId, setPaymentId] = useState("");
   const [terms, setTerms] = useState(initialTerms);
   const [status, setStatus] = useState<string | null>(null);
-  const [negotiationAction, setNegotiationAction] = useState<"idle" | "counter" | "accepted">("idle");
-  const [counterNotes, setCounterNotes] = useState("");
+  const [playerResponse, setPlayerResponse] = useState<"accept" | "counter" | "none">("none");
+  const [responseNotes, setResponseNotes] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleTermsChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
-  ) => {
-    setTerms({ ...terms, [e.target.name]: e.target.value });
-  };
+  const requiredMissing = useMemo(() => {
+    const missing: string[] = [];
+    if (!terms.party_a_label) missing.push("Your name");
+    if (!terms.party_b_label) missing.push("Backer name");
+    if (!terms.stake_pct) missing.push("Stake %");
+    if (!terms.buy_in_amount) missing.push("Buy-in amount");
+    if (!terms.event_date) missing.push("Event date");
+    const markup = parseFloat(terms.markup || "1");
+    if (Number.isNaN(markup) || markup < 0.5 || markup > 2) {
+      missing.push("Markup between 0.5× and 2.0×");
+    }
+    return missing;
+  }, [terms]);
 
   const summary = useMemo(() => {
     if (!terms.party_a_label && !terms.party_b_label) {
-      return "Document the promise before play begins.";
+      return "Document the freeze-out promise before cards are in the air.";
     }
     const stake = terms.stake_pct || "___";
     const buyIn = terms.buy_in_amount ? `$${terms.buy_in_amount}` : "$____";
     const eventDay = terms.event_date || "event date TBA";
     const basis = payoutBasisLabels[terms.payout_basis] || "payout basis TBD";
-    return `${terms.party_a_label || "Backer"} stakes ${stake}% of ${
-      terms.party_b_label || "Player"
-    } in ${buyIn} WSOP/Live event (${eventDay}). ${terms.party_b_label || "Player"} promises ${
-      stake || "___"
-    }% of ${basis}.`;
+    const markup = parseFloat(terms.markup || "1").toFixed(2);
+    return `${terms.party_a_label || "Player"} offers ${stake}% in a ${buyIn} freeze-out (${eventDay}) at ${markup}× markup. ${
+      terms.party_b_label || "Backer"
+    } receives ${stake || "___"}% of ${basis}.`;
   }, [terms]);
 
-  const stakeDollarValue = useMemo(() => {
-    const pct = Number(terms.stake_pct);
-    const buyIn = Number(terms.buy_in_amount);
-    if (!pct || !buyIn) {
-      return null;
+  const resolveApiBase = () => {
+    if (process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL.length > 0) {
+      return process.env.NEXT_PUBLIC_API_URL;
     }
-    return ((pct / 100) * buyIn).toFixed(2);
-  }, [terms.stake_pct, terms.buy_in_amount]);
+    if (typeof window !== "undefined") {
+      return window.location.origin;
+    }
+    return "";
+  };
 
-  const checklist = [
-    {
-      label: `Stake ${terms.stake_pct || "___"}% of $${terms.buy_in_amount || "____"} = $${
-        stakeDollarValue ?? "____"
-      } exposure`,
-      checked: Boolean(stakeDollarValue),
-    },
-    {
-      label: `Payout basis: ${payoutBasisLabels[terms.payout_basis] || "TBD"}`,
-      checked: Boolean(terms.payout_basis),
-    },
-    {
-      label: `Bullet cap set to ${terms.bullet_cap || "TBD"} and event ${terms.event_date || "TBD"}`,
-      checked: Boolean(terms.bullet_cap && terms.event_date),
-    },
-    {
-      label: terms.funds_received_at
-        ? `Funds logged at ${new Date(terms.funds_received_at).toLocaleString()}`
-        : "Log when funds arrive",
-      checked: Boolean(terms.funds_received_at),
-    },
-  ];
-
-const resolveApiBase = () => {
-  if (process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL.length > 0) {
-    return process.env.NEXT_PUBLIC_API_URL;
-  }
-  if (typeof window !== "undefined") {
-    return window.location.origin;
-  }
-  return "";
-};
-
-async function createPayment() {
-  const apiBase = resolveApiBase();
-  if (!apiBase) {
-    setStatus("API base URL is missing. Set NEXT_PUBLIC_API_URL.");
-    return;
-  }
-  setStatus("Creating checkout session...");
-  const response = await fetch(
-      `${apiBase}/api/v1/payments/checkout`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer dev-token" },
-        body: JSON.stringify({ amount_cents: 10000, currency: "usd" }),
-      }
-    );
-    const data = await response.json();
-    if (!response.ok) {
-      setStatus(`Payment failed: ${data.detail}`);
+  async function sendOffer() {
+    if (requiredMissing.length) {
+      setStatus(`Please fill: ${requiredMissing.join(", ")}`);
       return;
     }
-    setPaymentId(data.payment_id);
-    setStatus("Checkout session ready. Simulate payment in backend webhook.");
-  }
-
-  async function createAgreement() {
     const apiBase = resolveApiBase();
-    if (!paymentId) {
-      setStatus("Please create and complete payment first.");
+    if (!apiBase) {
+      setStatus("API base URL is missing. Set NEXT_PUBLIC_API_URL.");
       return;
     }
-    setStatus("Creating agreement draft for both parties...");
-  const response = await fetch(
-      `${apiBase}/api/v1/agreements`,
-      {
+    setIsSubmitting(true);
+    setStatus("Sending offer to backer...");
+    try {
+      const response = await fetch(`${apiBase}/api/v1/agreements`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer dev-token" },
         body: JSON.stringify({
-          payment_id: paymentId,
+          payment_id: "offer-intent",
           agreement_type: "poker_staking",
-          terms_version: "v1",
+          terms_version: "freezeout-v1",
           terms: {
             stake_pct: Number(terms.stake_pct || 0),
             buy_in_amount: Number(terms.buy_in_amount || 0),
-            bullet_cap: Number(terms.bullet_cap || 0),
+            bullet_cap: 1,
+            markup: parseFloat(terms.markup || "1"),
             payout_basis: terms.payout_basis,
             event_date: terms.event_date,
-            due_date: terms.due_date,
             party_a_label: terms.party_a_label,
             party_b_label: terms.party_b_label,
-            notes: counterNotes || terms.notes,
-            funds_received_at: terms.funds_received_at || null,
+            notes: terms.notes,
+            player_response: playerResponse,
+            response_notes: responseNotes || undefined,
           },
         }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.detail || "Offer failed");
       }
-    );
-
-    const data = await response.json();
-    if (!response.ok) {
-      setStatus(`Agreement failed: ${data.detail}`);
-      return;
+      setStatus(`Offer ${data.id} queued. Share the link so ${terms.party_b_label || "your backer"} can respond.`);
+      setTerms(initialTerms);
+      setPlayerResponse("none");
+      setResponseNotes("");
+    } catch (err) {
+      setStatus((err as Error).message);
+    } finally {
+      setIsSubmitting(false);
     }
-    setStatus(
-      `Agreement ${data.id} created as draft. Share the verification link so both parties can confirm identical payout terms before locking the receipt.`
-    );
-    setTerms(initialTerms);
-    setCounterNotes("");
-    setNegotiationAction("idle");
   }
 
-  const logFundsReceived = () => {
-    setTerms((prev) => ({
-      ...prev,
-      funds_received_at: new Date().toISOString(),
-    }));
-    setStatus("Funds receipt timestamp logged for audit trail.");
-  };
-
   return (
-    <section className="bg-white shadow rounded-lg p-4 space-y-3">
-      <header>
-        <h2 className="text-xl font-semibold">Contract Builder</h2>
-        <p className="text-sm text-gray-600">
-          Mobile-first entry flow to capture the exact staking promise before anyone plays.
-        </p>
+    <section className="card accent" style={{ display: "flex", flexDirection: "column", gap: "1.1rem" }}>
+      <header className="card-header">
+        <h2 className="card-title">Player Offer Composer</h2>
+        <p className="card-subtitle">Freeze-out template: max 1 bullet, single event date, markup 0.5×–2×.</p>
       </header>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div className="form-grid">
         <input
           name="party_a_label"
-          placeholder="Your label (Backer name)"
+          placeholder="Your name (Player)"
           value={terms.party_a_label}
           onChange={handleTermsChange}
-          className="border rounded px-3 py-2"
+          className="form-field"
         />
         <input
           name="party_b_label"
-          placeholder="Partner label (Player name)"
+          placeholder="Backer name"
           value={terms.party_b_label}
           onChange={handleTermsChange}
-          className="border rounded px-3 py-2"
+          className="form-field"
         />
         <input
           name="stake_pct"
@@ -200,31 +144,37 @@ async function createPayment() {
           placeholder="Stake % (e.g., 10)"
           value={terms.stake_pct}
           onChange={handleTermsChange}
-          className="border rounded px-3 py-2"
+          className="form-field"
         />
         <input
           name="buy_in_amount"
           type="number"
           min="0"
-          placeholder="Buy-in amount per bullet (USD)"
+          placeholder="Buy-in amount (USD)"
           value={terms.buy_in_amount}
           onChange={handleTermsChange}
-          className="border rounded px-3 py-2"
+          className="form-field"
         />
-        <input
-          name="bullet_cap"
-          type="number"
-          min="1"
-          placeholder="Bullet cap (e.g., 2)"
-          value={terms.bullet_cap}
-          onChange={handleTermsChange}
-          className="border rounded px-3 py-2"
-        />
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
+          <label style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>Markup (0.5× – 2.0×)</label>
+          <input
+            type="range"
+            min="0.5"
+            max="2"
+            step="0.1"
+            name="markup"
+            value={terms.markup}
+            onChange={handleTermsChange}
+            className="form-field"
+            style={{ accentColor: "var(--accent-secondary)" }}
+          />
+          <span className="status-text">Current markup: {parseFloat(terms.markup || "1").toFixed(2)}×</span>
+        </div>
         <select
           name="payout_basis"
           value={terms.payout_basis}
           onChange={handleTermsChange}
-          className="border rounded px-3 py-2"
+          className="form-field"
         >
           {Object.entries(payoutBasisLabels).map(([value, label]) => (
             <option key={value} value={value}>
@@ -238,112 +188,69 @@ async function createPayment() {
           placeholder="Event date"
           value={terms.event_date}
           onChange={handleTermsChange}
-          className="border rounded px-3 py-2"
-        />
-        <input
-          name="due_date"
-          type="date"
-          placeholder="Payout due date"
-          value={terms.due_date}
-          onChange={handleTermsChange}
-          className="border rounded px-3 py-2"
+          className="form-field"
         />
       </div>
       <textarea
         name="notes"
-        placeholder="Extra clauses (e.g., markup adjustments, travel %, profit splits)"
+        placeholder="Extra clauses (markup explanation, swap notes, etc.)"
         value={terms.notes}
         onChange={handleTermsChange}
-        className="border rounded px-3 py-2 w-full min-h-[80px]"
+        className="form-field"
+        style={{ minHeight: "90px" }}
       />
-      <div className="bg-indigo-50 border border-indigo-100 rounded p-3 text-sm text-indigo-900">
-        <p className="font-semibold mb-1">Promise Preview</p>
+      <div className="card secondary" style={{ padding: "1rem" }}>
+        <p className="card-title" style={{ fontSize: "1rem" }}>
+          Offer preview
+        </p>
         <p>{summary}</p>
-        <p className="mt-1 text-xs text-indigo-700">
-          Share this draft link/QR with your partner. Both must acknowledge the same payout basis
-          before ActionKeeper issues the tamper-evident receipt.
+        <p className="status-text">
+          Share the resulting link so your backer can accept or counter. Funds confirmation happens later—after both
+          sides agree.
         </p>
       </div>
-      <div className="bg-white border rounded p-3 space-y-2">
-        <p className="text-sm font-semibold">Checklist before locking</p>
-        <ul className="space-y-1">
-          {checklist.map((item) => (
-            <li key={item.label} className="flex items-center gap-2 text-sm">
-              <span
-                className={`h-4 w-4 rounded border flex items-center justify-center ${
-                  item.checked ? "bg-green-500 border-green-500 text-white" : "border-gray-300"
-                }`}
-              >
-                {item.checked ? "✓" : ""}
-              </span>
-              {item.label}
-            </li>
-          ))}
-        </ul>
-        <button
-          onClick={logFundsReceived}
-          className="px-3 py-1 text-xs border rounded text-indigo-700 border-indigo-200"
-        >
-          Log “Funds Received” Timestamp
-        </button>
-      </div>
-      <div className="bg-gray-50 border rounded p-3 space-y-2">
-        <p className="text-sm font-semibold">Swipe-style response</p>
-        <div className="flex gap-2">
+      <div className="card" style={{ padding: "1rem" }}>
+        <p className="card-title" style={{ fontSize: "1rem" }}>
+          Respond to a backer counter (optional)
+        </p>
+        <p className="status-text">
+          If David counters from the buyer hub, pick how you want to respond before sending a fresh draft.
+        </p>
+        <div className="pill-row" style={{ width: "100%" }}>
           <button
-            onClick={() => {
-              setNegotiationAction("counter");
-              setStatus("You swiped left. Add counter details and resend.");
-            }}
-            className="flex-1 px-3 py-2 border border-rose-300 text-rose-600 rounded"
+            onClick={() => setPlayerResponse("accept")}
+            className="btn btn-secondary"
+            style={playerResponse === "accept" ? { border: "1px solid var(--success)" } : {}}
           >
-            ⬅ Swipe Left (Counter)
+            Accept Counter
           </button>
           <button
-            onClick={() => {
-              setNegotiationAction("accepted");
-              setStatus("You swiped right. Agreement ready for confirmation once partner agrees.");
-            }}
-            className="flex-1 px-3 py-2 border border-emerald-300 text-emerald-600 rounded"
+            onClick={() => setPlayerResponse("counter")}
+            className="btn btn-outline"
+            style={playerResponse === "counter" ? { border: "1px solid var(--accent)" } : {}}
           >
-            Swipe Right (Accept)
+            Counter Again
           </button>
         </div>
-        {negotiationAction === "counter" && (
-          <div className="space-y-2">
-            <textarea
-              className="border rounded px-3 py-2 w-full text-sm"
-              placeholder="Describe what needs to change (e.g., 10% net instead of gross, cap bullets at 1)."
-              value={counterNotes}
-              onChange={(e) => setCounterNotes(e.target.value)}
-            />
-            <p className="text-xs text-gray-600">
-              This counter note will ride along with the draft so your partner sees why you swiped left.
-            </p>
-          </div>
-        )}
-        {negotiationAction === "accepted" && (
-          <p className="text-xs text-gray-600">
-            Once both of you swipe right, ActionKeeper flags the draft as ready and will embed the
-            promise into the tamper-evident receipt.
-          </p>
+        {playerResponse === "counter" && (
+          <textarea
+            className="form-field"
+            style={{ marginTop: "0.75rem" }}
+            placeholder="Describe your counter (e.g., 5% net but extend payouts by 7 days)."
+            value={responseNotes}
+            onChange={(e) => setResponseNotes(e.target.value)}
+          />
         )}
       </div>
-      <div className="flex gap-3 flex-wrap">
-        <button
-          onClick={createPayment}
-          className="px-4 py-2 bg-indigo-600 text-white rounded"
-        >
-          1. Create Payment
-        </button>
-        <button
-          onClick={createAgreement}
-          className="px-4 py-2 bg-green-600 text-white rounded"
-        >
-          2. Create Agreement
-        </button>
-      </div>
-      {status && <p className="text-sm text-gray-700">{status}</p>}
+      <button
+        onClick={sendOffer}
+        className="btn btn-primary"
+        style={{ width: "100%" }}
+        disabled={isSubmitting}
+      >
+        {isSubmitting ? "Sending…" : "Send Offer to Backer"}
+      </button>
+      {status && <p className="status-text">{status}</p>}
     </section>
   );
 }

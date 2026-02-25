@@ -47,55 +47,82 @@ async function load() {
     load();
   }, []);
 
+export default function AgreementVault() {
+  const [filter, setFilter] = useState<"all" | "ready" | "countered">("all");
+
+  const filteredAgreements = agreements.filter((agreement) => {
+    if (filter === "all") return true;
+    if (filter === "ready") {
+      return agreement.status === "awaiting_confirmation" || agreement.status === "accepted";
+    }
+    return agreement.status === "countered";
+  });
+
   return (
-    <section className="bg-white shadow rounded-lg p-4 space-y-3">
-      <header className="flex justify-between items-center">
+    <section className="card" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+      <header className="card-header" style={{ display: "flex", justifyContent: "space-between", gap: "1rem" }}>
         <div>
-          <h2 className="text-xl font-semibold">Agreement Vault</h2>
-          <p className="text-sm text-gray-600">
-            Track receipts, download PDFs, and open QR verification links.
+          <h2 className="card-title">Agreement Vault</h2>
+          <p className="card-subtitle">
+            Backer view: review player drafts, request changes, and pull receipts.
           </p>
         </div>
-        <button
-          onClick={load}
-          className="px-3 py-1 border rounded text-gray-700"
-        >
-          Refresh
-        </button>
-      </header>
-      <div className="space-y-2">
-        {agreements.map((agreement) => (
-          <div
-            key={agreement.id}
-            className="border rounded p-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between"
+        <div className="pill-row" style={{ justifyContent: "flex-end" }}>
+          <button
+            onClick={() => setFilter("all")}
+            className="btn btn-outline"
+            style={filter === "all" ? { borderColor: "var(--accent)", color: "var(--accent)" } : {}}
           >
-            <div>
-              <p className="font-semibold">#{agreement.id}</p>
-              <p className="text-sm text-gray-500">Status: {agreement.status}</p>
+            All
+          </button>
+          <button
+            onClick={() => setFilter("ready")}
+            className="btn btn-outline"
+            style={filter === "ready" ? { borderColor: "var(--success)", color: "var(--success)" } : {}}
+          >
+            Ready
+          </button>
+          <button
+            onClick={() => setFilter("countered")}
+            className="btn btn-outline"
+            style={filter === "countered" ? { borderColor: "var(--danger)", color: "var(--danger)" } : {}}
+          >
+            Needs Change
+          </button>
+          <button onClick={load} className="btn btn-outline" style={{ padding: "0.55rem 1.2rem" }}>
+            Refresh
+          </button>
+        </div>
+      </header>
+      <div className="vault-list">
+        {filteredAgreements.map((agreement) => (
+          <div key={agreement.id} className="vault-card">
+            <div style={{ marginBottom: "0.65rem" }}>
+              <p style={{ fontWeight: 600, margin: 0 }}>#{agreement.id}</p>
+              <p className="status-text" style={{ textTransform: "capitalize" }}>
+                Status: {agreement.status}
+              </p>
               {agreement.terms && (
-                <p className="text-xs text-gray-600 mt-1">
-                  {agreement.terms.stake_pct ?? "–"}% |
-                  {agreement.terms.payout_basis ?? "basis TBD"} | Buy-in $
-                  {agreement.terms.buy_in_amount ?? "–"} | Bullets{" "}
-                  {agreement.terms.bullet_cap ?? "–"} | Event{" "}
+                <p className="status-text" style={{ marginTop: "0.35rem" }}>
+                  {agreement.terms.stake_pct ?? "–"}% · {agreement.terms.payout_basis ?? "basis TBD"} · Buy-in $
+                  {agreement.terms.buy_in_amount ?? "–"} · Bullets {agreement.terms.bullet_cap ?? "–"} · Event{" "}
                   {agreement.terms.event_date ?? "TBD"}
                 </p>
               )}
             </div>
-            <div className="flex gap-2 flex-wrap">
+            <div className="vault-actions">
+              {agreement.status === "countered" && (
+                <span className="status-text" style={{ color: "var(--danger)" }}>
+                  Player requests change. Reply via your buyer tools (API or upcoming UI).
+                </span>
+              )}
               {agreement.qr_payload && (
-                <a
-                  href={agreement.qr_payload.verification_url}
-                  className="text-indigo-600 underline text-sm"
-                >
+                <a href={agreement.qr_payload.verification_url} className="link">
                   Open Verify Link
                 </a>
               )}
               {agreement.artifact && (
-                <a
-                  href={agreement.artifact.verification_url}
-                  className="text-indigo-600 underline text-sm"
-                >
+                <a href={agreement.artifact.verification_url} className="link">
                   Download Receipt PDF
                 </a>
               )}
