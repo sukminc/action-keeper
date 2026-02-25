@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from app.artifacts.pdf_renderer import render_agreement_pdf
+from app.core.config import settings
 from app.db.models.agreement import Agreement
 from app.repositories.agreements_repo import AgreementsRepo
 from app.repositories.artifacts_repo import AgreementArtifactsRepo
@@ -69,13 +70,13 @@ class AgreementsService:
         return agreement
 
     def _create_artifact(self, agreement: Agreement) -> None:
-        verify_base = os.getenv("VERIFY_BASE_URL", "http://localhost:8000").rstrip("/")
+        verify_base = settings.verify_base_url.rstrip("/")
         verification_url = generate_verification_url(
             str(agreement.id),
             agreement.hash or "",
             verify_base,
         )
-        artifacts_dir = os.getenv("ARTIFACTS_DIR", "artifacts")
+        artifacts_dir = settings.artifacts_dir
         output_dir = os.path.join(artifacts_dir, "agreements")
         file_path = render_agreement_pdf(
             agreement_id=str(agreement.id),

@@ -14,6 +14,7 @@ from app.repositories.artifacts_repo import AgreementArtifactsRepo
 from app.repositories.events_repo import EventsRepo
 from app.repositories.payments_repo import PaymentsRepo
 from app.schemas.agreement import AgreementRead, AgreementCreate
+from app.schemas.event import EventRead
 from app.services.agreements_service import AgreementsService
 from app.utils.hash_utils import HASH_VERSION, generate_verification_url
 
@@ -108,6 +109,28 @@ def list_agreements(
     service = _service(db)
     items = service.list(limit=limit, offset=offset)
     return [_serialize_agreement(service, item) for item in items]
+
+
+@router.get("/{agreement_id}/events", response_model=list[EventRead])
+def list_agreement_events(
+    agreement_id: str,
+    db: Session = Depends(get_db),
+) -> list[EventRead]:
+    service = _service(db)
+    agreement = service.get_by_id(agreement_id)
+    if not agreement:
+        raise HTTPException(status_code=404, detail="Agreement not found")
+    events = EventsRepo(db).list_for_agreement(agreement_id)
+    return [
+        EventRead(
+            id=str(evt.id),
+            agreement_id=str(evt.agreement_id),
+            event_type=evt.event_type,
+            payload=evt.payload,
+            created_at=evt.created_at,
+        )
+        for evt in events
+    ]
 
 
 @router.get("/{agreement_id}/artifact")

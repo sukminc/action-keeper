@@ -1,0 +1,80 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
+type Agreement = {
+  id: string;
+  status: string;
+  qr_payload?: { verification_url: string };
+  artifact?: { verification_url: string };
+};
+
+export default function AgreementVault() {
+  const [agreements, setAgreements] = useState<Agreement[]>([]);
+
+  async function load() {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/v1/agreements`,
+      {
+        headers: { Authorization: "Bearer dev-token" },
+      }
+    );
+    if (response.ok) {
+      setAgreements(await response.json());
+    }
+  }
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  return (
+    <section className="bg-white shadow rounded-lg p-4 space-y-3">
+      <header className="flex justify-between items-center">
+        <div>
+          <h2 className="text-xl font-semibold">Agreement Vault</h2>
+          <p className="text-sm text-gray-600">
+            Track receipts, download PDFs, and open QR verification links.
+          </p>
+        </div>
+        <button
+          onClick={load}
+          className="px-3 py-1 border rounded text-gray-700"
+        >
+          Refresh
+        </button>
+      </header>
+      <div className="space-y-2">
+        {agreements.map((agreement) => (
+          <div
+            key={agreement.id}
+            className="border rounded p-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between"
+          >
+            <div>
+              <p className="font-semibold">#{agreement.id}</p>
+              <p className="text-sm text-gray-500">Status: {agreement.status}</p>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              {agreement.qr_payload && (
+                <a
+                  href={agreement.qr_payload.verification_url}
+                  className="text-indigo-600 underline text-sm"
+                >
+                  Open Verify Link
+                </a>
+              )}
+              {agreement.artifact && (
+                <a
+                  href={agreement.artifact.verification_url}
+                  className="text-indigo-600 underline text-sm"
+                >
+                  Download Receipt PDF
+                </a>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
