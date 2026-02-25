@@ -20,17 +20,31 @@ Planned features by phase:
 - DB: Postgres
 - Local Dev: Docker Compose monorepo
 
-## Running Locally
-1. `cp .env.example .env` and set:
+## Running Locally (Current Testing Flow)
+1. Ensure Docker Desktop (or another Docker engine) is running; Compose cannot download Postgres without it.
+2. `cp .env.example .env` and set:
    - `NEXT_PUBLIC_API_URL=http://localhost:8000`
    - `VERIFY_BASE_URL=http://localhost:8000`
    - `STRIPE_WEBHOOK_SECRET=<random-test-secret>`
    - `API_TOKEN=dev-token`
-2. (Optional) override artifact output and rate limits via `ARTIFACTS_DIR=artifacts` and `RATE_LIMIT_PER_MINUTE=200`.
-3. `docker compose up --build db backend frontend` (backend now auto-runs Alembic migrations on startup, so Postgres instances stay in sync with the ORM).
-4. Open http://localhost:3000 for the UI and hit http://localhost:8000/api/v1/health to confirm the API.
-5. Simulate Stripe Checkout via `POST /api/v1/payments/checkout` and complete it by POSTing to `/api/v1/payments/webhook` with `X-Webhook-Secret`.
-6. Create agreements by POSTing to `/api/v1/agreements` with the paid `payment_id`, then download the deterministic PDF at `/api/v1/agreements/{id}/artifact`.
+   - optional: `ARTIFACTS_DIR=artifacts`, `RATE_LIMIT_PER_MINUTE=200`
+3. Apply migrations once before bringing up the stack (this prevents the `agreements.payment_id does not exist` error):
+   ```bash
+   docker compose run --rm backend alembic upgrade head
+   ```
+4. Start the full stack and rebuild images when backend code changes:
+   ```bash
+   docker compose up --build db backend frontend
+   ```
+   Watch `docker compose logs backend` for a clean "Application startup complete" message; migration failures (missing `script_location`) mean the container was launched before the latest code—rebuild and retry.
+5. Frontend dev server tasks (linting, `npm run dev`, etc.) must run from `frontend/`; running them at the repo root triggers `ENOENT` for `package.json`.
+6. Manual smoke test loop while Docker is up:
+   - `curl http://localhost:8000/api/v1/health`
+   - `POST /api/v1/payments/checkout` with `Authorization: Bearer dev-token`
+   - `POST /api/v1/payments/webhook` with `X-Webhook-Secret`
+   - `POST /api/v1/agreements` supplying the paid `payment_id`
+   - `GET /api/v1/agreements` and `/api/v1/agreements/{id}/artifact`
+   Keep an eye on backend logs; 404s from the webhook or 402 responses from agreements indicate the payment flow is still being wired up.
 
 ---
 ## Repository Structure
@@ -134,15 +148,26 @@ This structure enforces strict separation between API, persistence, and UI, and 
 
 ## Current Progress
 
-**Status as of today:**
-- **Parts 1–7:** Completed (tests passing).
-- Parts 8–10 remain on the roadmap.
+**Status as of today (2026-02-25):**
 
-**What is already working:**
-- FastAPI app boots and routes are registered (`/api/v1/health`, `/api/v1/agreements`, `/api/v1/payments`, `/api/v1/verify`).
-- Domain models + repositories + service layer cover agreements, payment intents, and artifact metadata.
-- Agreement creation now enforces a paid `payment_id`, hashes every contract, and stores deterministic PDF receipts with QR-ready verification URLs.
-- Docker Compose can bring up Postgres and the app can connect via `DATABASE_URL`.
+| Part | Status | Notes |
+| --- | --- | --- |
+| 1 — Foundation | ✅ Stable | Monorepo + health check verified locally. |
+| 2 — Domain Models | ✅ Stable | Agreements/events repositories pass unit tests. |
+| 3 — Service Layer | ✅ Stable | Business rules + event emission implemented. |
+| 4 — API Contracts | ✅ Stable | CRUD endpoints live, protected by `Authorization: Bearer dev-token`. |
+| 5 — Tamper-Evident Receipt | ⚠️ In progress | Hashing + verify endpoint exist, but QR codes are text-only and still waiting on visual rendering plus Prod verification tests. |
+| 6 — PDF Artifact Generation | ⚠️ In progress | Deterministic PDFs save to `ARTIFACTS_DIR`, yet migrations must run before `agreement_id` → artifact lookups succeed. |
+| 7 — Payments (Revenue MVP) | ⚠️ In progress | Checkout/webhook services are scaffolded, but the `payments` tables and `agreements.payment_id` column require the Alembic migration; until that lands, `/api/v1/agreements` returns HTTP 402/500. |
+| 8 — Mobile Contract Builder | 🚧 Not started | Frontend contract form + vault pending. |
+| 9 — Audit & Ops | 🚧 Not started | Rate limiting, structured logging, auth hardening queued. |
+|10 — Expansion Hooks | 🚧 Not started | Trip Planner + affiliate scaffolding queued. |
+
+**What is already working today:**
+- FastAPI boots locally and exposes `/api/v1/health` and agreement CRUD when the DB schema matches the ORM.
+- Alembic assets (`backend/alembic`) exist; running `alembic upgrade head` inside the backend container unblocks payment/receipt experiments.
+- Deterministic PDFs and verification URLs are generated on the backend; embedding an actual QR image is a known follow-up.
+- Docker Compose remains the canonical way to stand up Postgres + API + Next.js for manual testing.
 
 ---
 
