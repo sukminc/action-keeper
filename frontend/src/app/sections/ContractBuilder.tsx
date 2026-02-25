@@ -25,6 +25,11 @@ export default function ContractBuilder() {
   const [playerResponse, setPlayerResponse] = useState<"accept" | "counter" | "none">("none");
   const [responseNotes, setResponseNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const handleTermsChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+  ) => {
+    setTerms({ ...terms, [e.target.name]: e.target.value });
+  };
 
   const requiredMissing = useMemo(() => {
     const missing: string[] = [];

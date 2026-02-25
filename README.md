@@ -36,6 +36,11 @@ Planned features by phase:
    - optional: `ARTIFACTS_DIR=artifacts`, `RATE_LIMIT_PER_MINUTE=200`
 3. Apply migrations once before bringing up the stack (this prevents the `agreements.payment_id does not exist` error):
    ```bash
+   # If you changed DB credentials and see "password authentication failed",
+   # remove the old volume first:
+   docker compose down
+   docker volume rm action-keeper_postgres_data
+   docker compose up -d db
    docker compose run --rm backend alembic upgrade head
    ```
 4. Start the full stack and rebuild images when backend code changes:
@@ -51,6 +56,14 @@ Planned features by phase:
    - `POST /api/v1/agreements` supplying the paid `payment_id`
    - `GET /api/v1/agreements` and `/api/v1/agreements/{id}/artifact`
    Keep an eye on backend logs; 404s from the webhook or 402 responses from agreements indicate the payment flow is still being wired up.
+
+### 2026-02-25 Snapshot
+- **Negotiation-ready schema & migrations:** ORM models now capture payout basis, markup, event dates, counter metadata, and funds logs. The Alembic migration (`20260225_negotiation_fields`) creates these columns plus an `agreement_revisions` table. Running the migration still blocks on aligning Postgres credentials, so the backend currently fails with `psycopg.OperationalError: password authentication failed for user "admin"` until the DB volume is recreated with `POSTGRES_PASSWORD=postgres`.
+- **Frontend split by persona:** `/seller` hosts the Player Offer Composer (freeze-out template, markup slider, counter-response notes) while `/buyer` renders the Agreement Vault with filters. “Send Offer” now submits a single request; payment buttons were removed pending real checkout integration.
+- **Open issues:** 
+  - Postgres password alignment remains unresolved; follow the volume reset steps above if migrations fail.
+  - Buyer-side counters are not yet wired to the backend; the UI only provides guidance/placeholders.
+  - QR receipts still render text-only verification URLs; embedding an actual QR image is scoped for the next iteration once artifacts regenerate successfully.
 
 ---
 ## Repository Structure
@@ -165,7 +178,7 @@ This structure enforces strict separation between API, persistence, and UI, and 
 | 5 — Tamper-Evident Receipt | ⚠️ In progress | Hashing + verify endpoint exist, but QR codes are text-only and still waiting on visual rendering plus Prod verification tests. |
 | 6 — PDF Artifact Generation | ⚠️ In progress | Deterministic PDFs save to `ARTIFACTS_DIR`, yet migrations must run before `agreement_id` → artifact lookups succeed. |
 | 7 — Payments (Revenue MVP) | ⚠️ In progress | Checkout/webhook services are scaffolded, but the `payments` tables and `agreements.payment_id` column require the Alembic migration; until that lands, `/api/v1/agreements` returns HTTP 402/500. |
-| 8 — Mobile Contract Builder | 🚧 Not started | Needs explicit prompts for stake %, payout basis (gross vs. net), bullet limits, due date/event date, and dual-confirmation UX before finalizing. |
+| 8 — Mobile Contract Builder | ⚠️ In progress | Seller/Buyer pages exist (player offer composer + buyer vault), but counters and backend wiring are pending. |
 | 9 — Audit & Ops | 🚧 Not started | Rate limiting, structured logging, auth hardening queued. |
 |10 — Expansion Hooks | 🚧 Not started | Trip Planner + affiliate scaffolding queued. |
 

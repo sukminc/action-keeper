@@ -18,37 +18,32 @@ type Agreement = {
 
 export default function AgreementVault() {
   const [agreements, setAgreements] = useState<Agreement[]>([]);
+  const [filter, setFilter] = useState<"all" | "ready" | "countered">("all");
 
-const resolveApiBase = () => {
-  if (process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL.length > 0) {
-    return process.env.NEXT_PUBLIC_API_URL;
-  }
-  if (typeof window !== "undefined") {
-    return window.location.origin;
-  }
-  return "";
-};
+  const resolveApiBase = () => {
+    if (process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL.length > 0) {
+      return process.env.NEXT_PUBLIC_API_URL;
+    }
+    if (typeof window !== "undefined") {
+      return window.location.origin;
+    }
+    return "";
+  };
 
-async function load() {
-  const apiBase = resolveApiBase();
-  if (!apiBase) return;
-  const response = await fetch(
-      `${apiBase}/api/v1/agreements`,
-      {
-        headers: { Authorization: "Bearer dev-token" },
-      }
-    );
+  const load = async () => {
+    const apiBase = resolveApiBase();
+    if (!apiBase) return;
+    const response = await fetch(`${apiBase}/api/v1/agreements`, {
+      headers: { Authorization: "Bearer dev-token" },
+    });
     if (response.ok) {
       setAgreements(await response.json());
     }
-  }
+  };
 
   useEffect(() => {
     load();
   }, []);
-
-export default function AgreementVault() {
-  const [filter, setFilter] = useState<"all" | "ready" | "countered">("all");
 
   const filteredAgreements = agreements.filter((agreement) => {
     if (filter === "all") return true;

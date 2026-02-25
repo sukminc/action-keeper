@@ -6,7 +6,7 @@ services:
     container_name: action_keeper_db
     environment:
       POSTGRES_USER: admin
-      POSTGRES_PASSWORD: password
+      POSTGRES_PASSWORD: postgres
       POSTGRES_DB: action_keeper
     ports:
       - "5433:5432"
@@ -30,7 +30,7 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql+psycopg://admin:password@db:5432/action_keeper
+      DATABASE_URL: postgresql+psycopg://admin:postgres@db:5432/action_keeper
 
   frontend:
     build: ./frontend
