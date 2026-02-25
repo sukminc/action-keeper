@@ -9,6 +9,12 @@ Mobile-first **poker staking agreement** app focused on **revenue-first MVP**:
 **Primary feature:** Paid contract generation + verification  
 **Non-custodial:** ActionKeeper never holds funds; it standardizes agreements and provides proof artifacts.
 
+### Negotiation Safeguards (New Requirements)
+- Every agreement starts as a **shared draft** that can be viewed via link or QR, but it is *not binding* until both parties acknowledge identical payout terms.
+- The database must persist each revision (e.g., “10% of total payout” vs. “10% of net profit”) and clearly mark who proposed it and when they confirmed.
+- Counter-offers stay visible side-by-side so user A and user B can converge without confusion; ActionKeeper only generates the final receipt after both select the same option.
+- Receipts must embed the canonical promise text, due date/event date, stake percentage, bullet cap, and payout basis so future disputes (like dilution on multi-bullet entries) can be resolved instantly.
+
 Planned features by phase:
 - Phase 1 (Revenue MVP): Contract Builder → Pay → PDF + Hash + QR Verify → Vault/List
 - Phase 2: Trip Planner (budget + required % sale) + affiliate links
@@ -155,18 +161,18 @@ This structure enforces strict separation between API, persistence, and UI, and 
 | 1 — Foundation | ✅ Stable | Monorepo + health check verified locally. |
 | 2 — Domain Models | ✅ Stable | Agreements/events repositories pass unit tests. |
 | 3 — Service Layer | ✅ Stable | Business rules + event emission implemented. |
-| 4 — API Contracts | ✅ Stable | CRUD endpoints live, protected by `Authorization: Bearer dev-token`. |
+| 4 — API Contracts | ✅ Stable | CRUD endpoints live, protected by `Authorization: Bearer dev-token`. Counter-offer workflow is tracked in the backlog. |
 | 5 — Tamper-Evident Receipt | ⚠️ In progress | Hashing + verify endpoint exist, but QR codes are text-only and still waiting on visual rendering plus Prod verification tests. |
 | 6 — PDF Artifact Generation | ⚠️ In progress | Deterministic PDFs save to `ARTIFACTS_DIR`, yet migrations must run before `agreement_id` → artifact lookups succeed. |
 | 7 — Payments (Revenue MVP) | ⚠️ In progress | Checkout/webhook services are scaffolded, but the `payments` tables and `agreements.payment_id` column require the Alembic migration; until that lands, `/api/v1/agreements` returns HTTP 402/500. |
-| 8 — Mobile Contract Builder | 🚧 Not started | Frontend contract form + vault pending. |
+| 8 — Mobile Contract Builder | 🚧 Not started | Needs explicit prompts for stake %, payout basis (gross vs. net), bullet limits, due date/event date, and dual-confirmation UX before finalizing. |
 | 9 — Audit & Ops | 🚧 Not started | Rate limiting, structured logging, auth hardening queued. |
 |10 — Expansion Hooks | 🚧 Not started | Trip Planner + affiliate scaffolding queued. |
 
 **What is already working today:**
 - FastAPI boots locally and exposes `/api/v1/health` and agreement CRUD when the DB schema matches the ORM.
 - Alembic assets (`backend/alembic`) exist; running `alembic upgrade head` inside the backend container unblocks payment/receipt experiments.
-- Deterministic PDFs and verification URLs are generated on the backend; embedding an actual QR image is a known follow-up.
+- Deterministic PDFs and verification URLs are generated on the backend; embedding an actual QR image plus negotiation metadata is a known follow-up.
 - Docker Compose remains the canonical way to stand up Postgres + API + Next.js for manual testing.
 
 ---

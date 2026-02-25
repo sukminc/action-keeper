@@ -14,3 +14,4 @@ def init_models() -> None:
     from app.db.models import event  # noqa: F401
     from app.db.models import artifact  # noqa: F401
     from app.db.models import payment  # noqa: F401
+    from app.db.models import agreement_revision  # noqa: F401

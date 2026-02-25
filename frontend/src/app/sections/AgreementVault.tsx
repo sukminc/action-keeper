@@ -5,6 +5,13 @@ import { useEffect, useState } from "react";
 type Agreement = {
   id: string;
   status: string;
+  terms?: {
+    stake_pct?: number;
+    payout_basis?: string;
+    buy_in_amount?: number;
+    bullet_cap?: number;
+    event_date?: string;
+  };
   qr_payload?: { verification_url: string };
   artifact?: { verification_url: string };
 };
@@ -65,6 +72,15 @@ async function load() {
             <div>
               <p className="font-semibold">#{agreement.id}</p>
               <p className="text-sm text-gray-500">Status: {agreement.status}</p>
+              {agreement.terms && (
+                <p className="text-xs text-gray-600 mt-1">
+                  {agreement.terms.stake_pct ?? "–"}% |
+                  {agreement.terms.payout_basis ?? "basis TBD"} | Buy-in $
+                  {agreement.terms.buy_in_amount ?? "–"} | Bullets{" "}
+                  {agreement.terms.bullet_cap ?? "–"} | Event{" "}
+                  {agreement.terms.event_date ?? "TBD"}
+                </p>
+              )}
             </div>
             <div className="flex gap-2 flex-wrap">
               {agreement.qr_payload && (

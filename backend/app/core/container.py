@@ -8,6 +8,7 @@ from app.repositories.agreements_repo import AgreementsRepo
 from app.repositories.artifacts_repo import AgreementArtifactsRepo
 from app.repositories.events_repo import EventsRepo
 from app.repositories.payments_repo import PaymentsRepo
+from app.repositories.revisions_repo import AgreementRevisionsRepo
 from app.services.agreements_service import AgreementsService
 from app.services.payments_service import PaymentsService
 
@@ -18,6 +19,7 @@ def get_agreements_service(db: Session = Depends(get_db)) -> AgreementsService:
         EventsRepo(db),
         payments_repo=PaymentsRepo(db),
         artifacts_repo=AgreementArtifactsRepo(db),
+        revisions_repo=AgreementRevisionsRepo(db),
     )
 
 

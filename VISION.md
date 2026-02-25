@@ -39,6 +39,7 @@ When implementation choices feel unclear, this file is the reference point.
 - A **paid poker staking agreement generator**
 - A **tamper-evident receipt system** (hash-based verification)
 - A **neutral record keeper**
+- A **negotiation log** that captures every revision until both humans agree on the same promise
 
 ### What ActionKeeper IS NOT (for now)
 - A wallet
@@ -55,10 +56,13 @@ When implementation choices feel unclear, this file is the reference point.
 - Represent *shared intent*, not guaranteed outcomes
 - Are immutable once finalized (content-wise)
 - Can evolve in **status**, not in original terms
+- Must capture **payout basis** explicitly (gross payout, net profit, or dilution-adjusted) along with stake %, buy-in limit, bullets, and due date so “10% of total vs. 10% net” conflicts never reappear.
 
 ### Status (conceptual, future-ready)
 - draft
 - proposed
+- countered
+- awaiting_confirmation
 - accepted
 - active
 - reported_profit
@@ -76,6 +80,7 @@ When implementation choices feel unclear, this file is the reference point.
 - Events are **append-only**
 - Events represent *claims or actions by a single actor*
 - Events alone do NOT change agreement status
+- Negotiation events (draft → counter → confirmation) must reference both actors and the exact terms being accepted; ActionKeeper should store every revision so either party can audit why the final contract says what it says.
 
 ### Dual-Confirmation Principle
 Certain status changes require:
@@ -93,6 +98,7 @@ Only then can the agreement be considered objectively updated.
 - Loss is a valid outcome, not a failure
 - “Unable to repay” is recorded, not punished
 - ActionKeeper does not judge morality or intent
+- The system’s role extends to **pre-loss clarity**: enforce that stake percentages, payout basis, and bullet caps are written and signed before the event date.
 
 The system’s role is **historical accuracy**, not enforcement.
 

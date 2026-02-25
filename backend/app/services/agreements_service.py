@@ -9,6 +9,7 @@ from app.repositories.agreements_repo import AgreementsRepo
 from app.repositories.artifacts_repo import AgreementArtifactsRepo
 from app.repositories.events_repo import EventsRepo
 from app.repositories.payments_repo import PaymentsRepo
+from app.repositories.revisions_repo import AgreementRevisionsRepo
 from app.schemas.agreement import AgreementCreate
 from app.utils.hash_utils import HASH_VERSION, compute_agreement_hash, generate_verification_url
 
@@ -22,11 +23,13 @@ class AgreementsService:
         events_repo: EventsRepo,
         payments_repo: PaymentsRepo | None = None,
         artifacts_repo: AgreementArtifactsRepo | None = None,
+        revisions_repo: AgreementRevisionsRepo | None = None,
     ):
         self.agreements_repo = agreements_repo
         self.events_repo = events_repo
         self.payments_repo = payments_repo
         self.artifacts_repo = artifacts_repo
+        self.revisions_repo = revisions_repo
 
     def _ensure_payment_ready(self, payment_id: Optional[str]) -> None:
         if not payment_id:
@@ -37,11 +40,51 @@ class AgreementsService:
         if not payment or payment.status != "paid":
             raise ValueError("Payment is required before generating agreement")
 
+    def _hydrate_structured_fields(self, data: AgreementCreate) -> None:
+        terms = data.terms or {}
+        if data.stake_percent is None and "stake_pct" in terms:
+            try:
+                data.stake_percent = float(terms["stake_pct"])
+            except (TypeError, ValueError):
+                data.stake_percent = None
+        if data.buy_in_amount_cents is None and "buy_in_amount" in terms:
+            try:
+                data.buy_in_amount_cents = int(round(float(terms["buy_in_amount"]) * 100))
+            except (TypeError, ValueError):
+                data.buy_in_amount_cents = None
+        if data.bullet_cap is None and "bullet_cap" in terms:
+            try:
+                data.bullet_cap = int(terms["bullet_cap"])
+            except (TypeError, ValueError):
+                data.bullet_cap = None
+        if data.payout_basis in (None, "") and terms.get("payout_basis"):
+            data.payout_basis = terms["payout_basis"]
+        if data.party_a_label is None and terms.get("party_a_label"):
+            data.party_a_label = terms["party_a_label"]
+        if data.party_b_label is None and terms.get("party_b_label"):
+            data.party_b_label = terms["party_b_label"]
+        if data.event_date is None and terms.get("event_date"):
+            try:
+                data.event_date = datetime.fromisoformat(terms["event_date"]).date()
+            except (TypeError, ValueError):
+                data.event_date = None
+        if data.due_date is None and terms.get("due_date"):
+            try:
+                data.due_date = datetime.fromisoformat(terms["due_date"]).date()
+            except (TypeError, ValueError):
+                data.due_date = None
+        if data.funds_logged_at is None and terms.get("funds_received_at"):
+            try:
+                data.funds_logged_at = datetime.fromisoformat(terms["funds_received_at"])
+            except (TypeError, ValueError):
+                data.funds_logged_at = None
+
     def create_agreement(self, data: AgreementCreate) -> Agreement:
         """
         Create a new agreement with tamper-evident hash and artifact.
         """
         self._ensure_payment_ready(data.payment_id)
+        self._hydrate_structured_fields(data)
 
         agreement = self.agreements_repo.create(data)
 
@@ -58,14 +101,41 @@ class AgreementsService:
         if self.artifacts_repo:
             self._create_artifact(agreement)
 
+        if self.revisions_repo:
+            self.revisions_repo.append(
+                agreement_id=agreement.id,
+                status=agreement.negotiation_state,
+                terms_snapshot=agreement.terms,
+                proposer_label=data.proposer_label,
+            )
+
+        event_type = "agreement_created"
+        if agreement.negotiation_state == "countered":
+            event_type = "negotiation_countered"
+        elif agreement.negotiation_state == "awaiting_confirmation":
+            event_type = "awaiting_confirmation"
+
         self.events_repo.append(
             agreement_id=agreement.id,
-            event_type="agreement_created",
+            event_type=event_type,
             payload={
                 "hash": agreement.hash,
                 "hash_version": agreement.hash_version,
+                "payout_basis": agreement.payout_basis,
+                "stake_percent": agreement.stake_percent,
+                "buy_in_amount_cents": agreement.buy_in_amount_cents,
+                "bullet_cap": agreement.bullet_cap,
+                "party_a": agreement.party_a_label,
+                "party_b": agreement.party_b_label,
             },
         )
+
+        if agreement.funds_logged_at:
+            self.events_repo.append(
+                agreement_id=agreement.id,
+                event_type="funds_logged",
+                payload={"timestamp": agreement.funds_logged_at.isoformat()},
+            )
 
         return agreement
 
