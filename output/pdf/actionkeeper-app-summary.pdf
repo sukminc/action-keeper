@@ -1,0 +1,114 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 2676 >>
+stream
+BT
+/F1 20 Tf
+1 0 0 1 72 784.00 Tm
+(ActionKeeper App Snapshot) Tj
+/F1 13 Tf
+1 0 0 1 72 762.00 Tm
+(WHAT IT IS) Tj
+/F1 11 Tf
+1 0 0 1 72 748.00 Tm
+(ActionKeeper is a mobile-first poker staking contract builder focused on a revenue-first MVP.) Tj
+/F1 11 Tf
+1 0 0 1 72 734.00 Tm
+(It standardizes deal terms and issues tamper-evident proof artifacts without holding funds.) Tj
+/F1 13 Tf
+1 0 0 1 72 706.00 Tm
+(WHO IT'S FOR) Tj
+/F1 11 Tf
+1 0 0 1 72 692.00 Tm
+(Poker backers, stakers, and players who need trustworthy staking agreements on their phones.) Tj
+/F1 13 Tf
+1 0 0 1 72 664.00 Tm
+(WHAT IT DOES) Tj
+/F1 11 Tf
+1 0 0 1 72 651.00 Tm
+(- FastAPI agreement API \(create, list, retrieve\) with service and repository layers plus tests.) Tj
+/F1 11 Tf
+1 0 0 1 72 638.00 Tm
+(- Paid contract generation monetized through Stripe Checkout as the Phase 1 revenue gate.) Tj
+/F1 11 Tf
+1 0 0 1 72 625.00 Tm
+(- Tamper-evident receipts that hash agreements and power QR verification \(Part 5 next\).) Tj
+/F1 11 Tf
+1 0 0 1 72 612.00 Tm
+(- Agreement vault/list views and stored artifacts for every staking contract.) Tj
+/F1 11 Tf
+1 0 0 1 72 599.00 Tm
+(- Trip Planner budgeting plus affiliate hooks extend the experience into travel logistics.) Tj
+/F1 11 Tf
+1 0 0 1 72 586.00 Tm
+(- Verified resume expansion reuses agreement history beyond poker staking.) Tj
+/F1 13 Tf
+1 0 0 1 72 558.00 Tm
+(HOW IT WORKS) Tj
+/F1 11 Tf
+1 0 0 1 72 545.00 Tm
+(- Frontend: Next.js App Router in `frontend/src/app`.) Tj
+/F1 11 Tf
+1 0 0 1 72 533.00 Tm
+(  Dockerized via `frontend/Dockerfile`, it calls the API through `NEXT_PUBLIC_API_URL`.) Tj
+/F1 11 Tf
+1 0 0 1 72 520.00 Tm
+(- Backend: FastAPI entrypoint `backend/app/main.py` wires API, schemas, services, and repositories.) Tj
+/F1 11 Tf
+1 0 0 1 72 508.00 Tm
+(  Routes `/api/v1/agreements` and `/api/v1/health` persist via SQLAlchemy models and emit events.) Tj
+/F1 11 Tf
+1 0 0 1 72 495.00 Tm
+(- Persistence: Dockerized Postgres 15 \(`db`\) stores agreements + events; tests run on SQLite.) Tj
+/F1 11 Tf
+1 0 0 1 72 482.00 Tm
+(- Flow: User builds a contract in Next.js; backend validates through services.) Tj
+/F1 11 Tf
+1 0 0 1 72 470.00 Tm
+(  Repositories commit to Postgres events, and Part 5 will add hashing + QR receipts.) Tj
+/F1 13 Tf
+1 0 0 1 72 442.00 Tm
+(HOW TO RUN) Tj
+/F1 11 Tf
+1 0 0 1 72 428.00 Tm
+(1. Copy `.env.example` to `.env` and set `NEXT_PUBLIC_API_URL=http://localhost:8000`.) Tj
+/F1 11 Tf
+1 0 0 1 72 414.00 Tm
+(2. Run `docker compose up --build db backend frontend` to launch Postgres, FastAPI, and Next.js.) Tj
+/F1 11 Tf
+1 0 0 1 72 400.00 Tm
+(3. Open http://localhost:3000 for the UI and http://localhost:8000/api/v1/health to verify the API.) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+
+0000000009 00000 n 
+
+0000000058 00000 n 
+
+0000000115 00000 n 
+
+0000000241 00000 n 
+
+0000002969 00000 n 
+
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+3039
+%%EOF

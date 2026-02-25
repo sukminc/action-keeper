@@ -4,6 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.repositories.agreements_repo import AgreementsRepo
+from app.repositories.events_repo import EventsRepo
 from app.schemas.agreement import AgreementCreate, AgreementRead
 from app.services.agreements_service import AgreementsService
 
@@ -12,12 +14,15 @@ router = APIRouter(prefix="/agreements", tags=["agreements"])
 
 @router.post("", response_model=AgreementRead, status_code=201)
 def create_agreement(
-    payload: AgreementCreate,
-    db: Session = Depends(get_db),
-) -> AgreementRead:
-    svc = AgreementsService(db)
-    agreement = svc.create(payload)
-    return AgreementRead.model_validate(agreement)
+    data: AgreementCreate,
+    db: Session = Depends(get_db)
+):
+    """Create new agreement with hash."""
+    agreements_repo = AgreementsRepo(db)
+    events_repo = EventsRepo(db)
+    service = AgreementsService(agreements_repo, events_repo)
+    agreement = service.create_agreement(data)
+    return agreement
 
 
 @router.get("/{agreement_id}", response_model=AgreementRead)

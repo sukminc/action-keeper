@@ -30,3 +30,12 @@ class AgreementsRepo:
     def list(self, limit: int = 50, offset: int = 0) -> List[Agreement]:
         stmt = select(Agreement).offset(offset).limit(limit)
         return list(self.session.execute(stmt).scalars().all())
+
+    def get_by_hash(self, hash_value: str) -> Optional[Agreement]:
+        """
+        Retrieve agreement by hash value.
+        """
+        from app.db.models.agreement import Agreement
+        return self.session.query(Agreement).filter(
+            Agreement.hash == hash_value
+        ).first()
