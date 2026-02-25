@@ -17,10 +17,25 @@ export default function ContractBuilder() {
     setTerms({ ...terms, [e.target.name]: e.target.value });
   };
 
-  async function createPayment() {
-    setStatus("Creating checkout session...");
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/v1/payments/checkout`,
+const resolveApiBase = () => {
+  if (process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL.length > 0) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+  if (typeof window !== "undefined") {
+    return window.location.origin;
+  }
+  return "";
+};
+
+async function createPayment() {
+  const apiBase = resolveApiBase();
+  if (!apiBase) {
+    setStatus("API base URL is missing. Set NEXT_PUBLIC_API_URL.");
+    return;
+  }
+  setStatus("Creating checkout session...");
+  const response = await fetch(
+      `${apiBase}/api/v1/payments/checkout`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer dev-token" },
@@ -37,13 +52,14 @@ export default function ContractBuilder() {
   }
 
   async function createAgreement() {
+    const apiBase = resolveApiBase();
     if (!paymentId) {
       setStatus("Please create and complete payment first.");
       return;
     }
     setStatus("Creating agreement...");
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/v1/agreements`,
+  const response = await fetch(
+      `${apiBase}/api/v1/agreements`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer dev-token" },

@@ -14,9 +14,21 @@ export default function TripPlannerWidget() {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  async function planTrip() {
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/v1/trip-planner/plan`,
+const resolveApiBase = () => {
+  if (process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL.length > 0) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+  if (typeof window !== "undefined") {
+    return window.location.origin;
+  }
+  return "";
+};
+
+async function planTrip() {
+  const apiBase = resolveApiBase();
+  if (!apiBase) return;
+  const response = await fetch(
+      `${apiBase}/api/v1/trip-planner/plan`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer dev-token" },

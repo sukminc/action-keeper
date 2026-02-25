@@ -12,9 +12,21 @@ type Agreement = {
 export default function AgreementVault() {
   const [agreements, setAgreements] = useState<Agreement[]>([]);
 
-  async function load() {
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/v1/agreements`,
+const resolveApiBase = () => {
+  if (process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL.length > 0) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+  if (typeof window !== "undefined") {
+    return window.location.origin;
+  }
+  return "";
+};
+
+async function load() {
+  const apiBase = resolveApiBase();
+  if (!apiBase) return;
+  const response = await fetch(
+      `${apiBase}/api/v1/agreements`,
       {
         headers: { Authorization: "Bearer dev-token" },
       }
