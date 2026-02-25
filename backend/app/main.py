@@ -2,6 +2,8 @@ import json
 import logging
 import time
 from contextlib import asynccontextmanager
+from pathlib import Path
+import os
 
 from fastapi import FastAPI, Request
 
@@ -30,10 +32,30 @@ logging.basicConfig(level=settings.log_level, handlers=[handler])
 logger = logging.getLogger("actionkeeper.api")
 
 
+def run_migrations() -> None:
+    if "ALEMBIC_SKIP" in os.environ:
+        return
+    try:
+        from alembic import command
+        from alembic.config import Config
+    except ImportError:
+        logger.warning("Alembic not installed; skipping migrations")
+        return
+
+    url = engine.url
+    if url.get_backend_name().startswith("sqlite") and (url.database in (None, "", ":memory:")):
+        return
+    cfg_path = Path(__file__).resolve().parents[2] / "alembic.ini"
+    alembic_cfg = Config(str(cfg_path))
+    alembic_cfg.set_main_option("sqlalchemy.url", str(url))
+    command.upgrade(alembic_cfg, "head")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_models()
     Base.metadata.create_all(bind=engine)
+    run_migrations()
     yield
 
 

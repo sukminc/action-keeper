@@ -25,10 +25,11 @@ Planned features by phase:
    - `NEXT_PUBLIC_API_URL=http://localhost:8000`
    - `VERIFY_BASE_URL=http://localhost:8000`
    - `STRIPE_WEBHOOK_SECRET=<random-test-secret>`
-2. (Optional) override artifact output via `ARTIFACTS_DIR=artifacts`.
-3. `docker compose up --build db backend frontend`
+   - `API_TOKEN=dev-token`
+2. (Optional) override artifact output and rate limits via `ARTIFACTS_DIR=artifacts` and `RATE_LIMIT_PER_MINUTE=200`.
+3. `docker compose up --build db backend frontend` (backend now auto-runs Alembic migrations on startup, so Postgres instances stay in sync with the ORM).
 4. Open http://localhost:3000 for the UI and hit http://localhost:8000/api/v1/health to confirm the API.
-5. Simulate Stripe Checkout via `POST /api/v1/payments/checkout` and complete it by POSTing to `/api/v1/payments/webhook` with the header `X-Webhook-Secret`.
+5. Simulate Stripe Checkout via `POST /api/v1/payments/checkout` and complete it by POSTing to `/api/v1/payments/webhook` with `X-Webhook-Secret`.
 6. Create agreements by POSTing to `/api/v1/agreements` with the paid `payment_id`, then download the deterministic PDF at `/api/v1/agreements/{id}/artifact`.
 
 ---
