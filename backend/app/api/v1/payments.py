@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-import os
-
 from fastapi import APIRouter, Depends, Header, HTTPException, status
-from sqlalchemy.orm import Session
 
-from app.db.session import get_db
-from app.repositories.payments_repo import PaymentsRepo
+from app.core.config import settings
+from app.core.container import get_payments_service
 from app.schemas.payment import (
     PaymentCheckoutRequest,
     PaymentCheckoutResponse,
@@ -18,16 +15,11 @@ from app.services.payments_service import PaymentsService
 router = APIRouter(prefix="/payments", tags=["payments"])
 
 
-def _service(db: Session) -> PaymentsService:
-    return PaymentsService(PaymentsRepo(db))
-
-
 @router.post("/checkout", response_model=PaymentCheckoutResponse, status_code=201)
 def create_checkout_session(
     payload: PaymentCheckoutRequest,
-    db: Session = Depends(get_db),
+    service: PaymentsService = Depends(get_payments_service),
 ):
-    service = _service(db)
     payment, checkout_url = service.create_checkout_session(
         amount_cents=payload.amount_cents,
         currency=payload.currency,
@@ -43,13 +35,15 @@ def create_checkout_session(
 @router.post("/webhook", status_code=200)
 def stripe_webhook(
     event: PaymentWebhookEvent,
-    db: Session = Depends(get_db),
+    service: PaymentsService = Depends(get_payments_service),
     x_webhook_secret: str | None = Header(default=None),
 ):
-    secret = os.getenv("STRIPE_WEBHOOK_SECRET")
+    secret = settings.stripe_webhook_secret
     if secret and secret != x_webhook_secret:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook signature")
-    service = _service(db)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid webhook signature",
+        )
     payment = service.handle_webhook(payment_id=event.payment_id, event=event.event)
     if not payment:
         raise HTTPException(status_code=404, detail="Payment not found or unsupported event")
@@ -57,8 +51,7 @@ def stripe_webhook(
 
 
 @router.get("/{payment_id}", response_model=PaymentRead)
-def get_payment(payment_id: str, db: Session = Depends(get_db)):
-    service = _service(db)
+def get_payment(payment_id: str, service: PaymentsService = Depends(get_payments_service)):
     payment = service.get(payment_id)
     if not payment:
         raise HTTPException(status_code=404, detail="Payment not found")

@@ -1,10 +1,9 @@
 import json
 import logging
+import os
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
-import os
-
 from fastapi import FastAPI, Request
 
 from app.api.v1 import router as v1_router
@@ -36,18 +35,23 @@ def run_migrations() -> None:
     if "ALEMBIC_SKIP" in os.environ:
         return
     try:
-        from alembic import command
-        from alembic.config import Config
+        from alembic import command  # type: ignore[import-not-found]
+        from alembic.config import Config  # type: ignore[import-not-found]
     except ImportError:
         logger.warning("Alembic not installed; skipping migrations")
         return
 
     url = engine.url
-    if url.get_backend_name().startswith("sqlite") and (url.database in (None, "", ":memory:")):
+    sqlite_backend = url.get_backend_name().startswith("sqlite")
+    memory_db = url.database in (None, "", ":memory:")
+    if sqlite_backend and memory_db:
         return
-    cfg_path = Path(__file__).resolve().parents[2] / "alembic.ini"
+    project_root = Path(__file__).resolve().parents[1]
+    cfg_path = project_root / "alembic.ini"
     alembic_cfg = Config(str(cfg_path))
     alembic_cfg.set_main_option("sqlalchemy.url", str(url))
+    script_location = project_root / "alembic"
+    alembic_cfg.set_main_option("script_location", str(script_location))
     command.upgrade(alembic_cfg, "head")
 
 

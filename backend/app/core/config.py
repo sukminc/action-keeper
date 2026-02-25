@@ -9,7 +9,7 @@ class Settings:
     rate_limit_per_minute: int = int(os.getenv("RATE_LIMIT_PER_MINUTE", "120"))
     verify_base_url: str = os.getenv("VERIFY_BASE_URL", "http://localhost:8000")
     artifacts_dir: str = os.getenv("ARTIFACTS_DIR", "artifacts")
-    stripe_webhook_secret: str | None = os.getenv("STRIPE_WEBHOOK_SECRET")
+    stripe_webhook_secret: str | None = os.getenv("STRIPE_WEBHOOK_SECRET", "test-secret")
     log_level: str = os.getenv("LOG_LEVEL", "INFO")
 
     @property

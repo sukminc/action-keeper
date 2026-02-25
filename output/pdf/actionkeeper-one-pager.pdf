@@ -1,0 +1,207 @@
+%PDF-1.4
+%âãÏÓ
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 3452 >>
+stream
+BT
+/F1 16 Tf
+1 0 0 1 60 713.00 Tm
+(ActionKeeper â€” Poker Staking Agreement MVP) Tj
+ET
+BT
+/F1 12 Tf
+1 0 0 1 60 690.00 Tm
+(WHAT IT IS) Tj
+ET
+BT
+/F1 10 Tf
+1 0 0 1 60 677.00 Tm
+(ActionKeeper is a mobile-first poker staking agreement generator built for revenue-first) Tj
+ET
+BT
+/F1 10 Tf
+1 0 0 1 60 664.00 Tm
+(delivery. It produces paid, tamper-evident receipts so backers and players share a neutral) Tj
+ET
+BT
+/F1 10 Tf
+1 0 0 1 60 651.00 Tm
+(proof of terms.) Tj
+ET
+BT
+/F1 12 Tf
+1 0 0 1 60 628.00 Tm
+(WHO IT'S FOR) Tj
+ET
+BT
+/F1 10 Tf
+1 0 0 1 60 615.00 Tm
+(Poker backers and stakers who need lightweight, verifiable contracts without custodial funds) Tj
+ET
+BT
+/F1 10 Tf
+1 0 0 1 60 602.00 Tm
+(or heavy compliance overhead.) Tj
+ET
+BT
+/F1 12 Tf
+1 0 0 1 60 579.00 Tm
+(WHAT IT DOES) Tj
+ET
+BT
+/F1 10 Tf
+1 0 0 1 60 566.00 Tm
+(- Guided contract builder captures structured staking terms through FastAPI) Tj
+ET
+BT
+/F1 10 Tf
+1 0 0 1 60 553.00 Tm
+(      create/list/retrieve endpoints.) Tj
+ET
+BT
+/F1 10 Tf
+1 0 0 1 60 540.00 Tm
+(- Deterministic hashing plus /api/v1/verify deliver tamper-evident receipts with QR-ready) Tj
+ET
+BT
+/F1 10 Tf
+1 0 0 1 60 527.00 Tm
+(      payloads.) Tj
+ET
+BT
+/F1 10 Tf
+1 0 0 1 60 514.00 Tm
+(- PDF artifact pipeline stores shareable agreements with embedded hash and verification URL.) Tj
+ET
+BT
+/F1 10 Tf
+1 0 0 1 60 501.00 Tm
+(- Stripe-style checkout flow enforces a paid payment_id before agreement creation and) Tj
+ET
+BT
+/F1 10 Tf
+1 0 0 1 60 488.00 Tm
+(      validates webhooks.) Tj
+ET
+BT
+/F1 10 Tf
+1 0 0 1 60 475.00 Tm
+(- Repositories/services persist payment linkage so vault/list APIs only expose paid contracts.) Tj
+ET
+BT
+/F1 10 Tf
+1 0 0 1 60 462.00 Tm
+(- Dockerized Next.js frontend and FastAPI backend provide the mobile-first poker staking) Tj
+ET
+BT
+/F1 10 Tf
+1 0 0 1 60 449.00 Tm
+(      surface.) Tj
+ET
+BT
+/F1 12 Tf
+1 0 0 1 60 426.00 Tm
+(HOW IT WORKS) Tj
+ET
+BT
+/F1 10 Tf
+1 0 0 1 60 413.00 Tm
+(- Frontend: Next.js App Router mobile-first UI calls the API via NEXT_PUBLIC_API_URL.) Tj
+ET
+BT
+/F1 10 Tf
+1 0 0 1 60 400.00 Tm
+(- Backend: FastAPI layers routers, services, repositories, and SQLAlchemy models in) Tj
+ET
+BT
+/F1 10 Tf
+1 0 0 1 60 387.00 Tm
+(      backend/app.) Tj
+ET
+BT
+/F1 10 Tf
+1 0 0 1 60 374.00 Tm
+(- Database: Postgres via SQLAlchemy with auto-run Alembic migrations when docker compose up) Tj
+ET
+BT
+/F1 10 Tf
+1 0 0 1 60 361.00 Tm
+(      executes.) Tj
+ET
+BT
+/F1 10 Tf
+1 0 0 1 60 348.00 Tm
+(- Flow: Contract input â†’ POST /payments/checkout â†’ webhook confirmation â†’ POST /agreements â†’) Tj
+ET
+BT
+/F1 10 Tf
+1 0 0 1 60 335.00 Tm
+(      PDF artifact + hash served for verification.) Tj
+ET
+BT
+/F1 12 Tf
+1 0 0 1 60 312.00 Tm
+(HOW TO RUN) Tj
+ET
+BT
+/F1 10 Tf
+1 0 0 1 60 299.00 Tm
+(1. Copy .env.example to .env and set NEXT_PUBLIC_API_URL, VERIFY_BASE_URL,) Tj
+ET
+BT
+/F1 10 Tf
+1 0 0 1 60 286.00 Tm
+(      STRIPE_WEBHOOK_SECRET, and API_TOKEN.) Tj
+ET
+BT
+/F1 10 Tf
+1 0 0 1 60 273.00 Tm
+(2. Run `docker compose up --build db backend frontend` to start Postgres, FastAPI, and Next.js.) Tj
+ET
+BT
+/F1 10 Tf
+1 0 0 1 60 260.00 Tm
+(3. Open http://localhost:3000 for the UI and confirm the API at) Tj
+ET
+BT
+/F1 10 Tf
+1 0 0 1 60 247.00 Tm
+(      http://localhost:8000/api/v1/health.) Tj
+ET
+BT
+/F1 10 Tf
+1 0 0 1 60 234.00 Tm
+(4. POST /api/v1/payments/checkout, confirm via /api/v1/payments/webhook, then POST) Tj
+ET
+BT
+/F1 10 Tf
+1 0 0 1 60 221.00 Tm
+(      /api/v1/agreements with the paid payment_id to generate the PDF artifact.) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000121 00000 n 
+0000000247 00000 n 
+0000003751 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+3821
+%%EOF

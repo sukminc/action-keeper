@@ -4,18 +4,11 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
 
-from app.db.session import get_db
-from app.repositories.agreements_repo import AgreementsRepo
-from app.repositories.events_repo import EventsRepo
+from app.core.container import get_agreements_service
 from app.services.agreements_service import AgreementsService
 
 router = APIRouter(prefix="/verify", tags=["verification"])
-
-
-def _service(db: Session) -> AgreementsService:
-    return AgreementsService(AgreementsRepo(db), EventsRepo(db))
 
 
 def _agreement_summary(service: AgreementsService, agreement_id: str) -> Optional[dict]:
@@ -53,13 +46,12 @@ class VerificationRequest(BaseModel):
 def verify_agreement_get(
     id: str = Query(..., description="Agreement UUID"),
     hash: str = Query(..., description="SHA-256 hash to verify"),
-    db: Session = Depends(get_db),
+    service: AgreementsService = Depends(get_agreements_service),
 ):
     """
     Verify agreement integrity via hash comparison (GET method).
     Public endpoint - no authentication required.
     """
-    service = _service(db)
     try:
         result = service.verify_agreement(
             agreement_id=id,
@@ -76,12 +68,11 @@ def verify_agreement_get(
 @router.post("", response_model=VerificationResponse)
 def verify_agreement_post(
     request: VerificationRequest,
-    db: Session = Depends(get_db),
+    service: AgreementsService = Depends(get_agreements_service),
 ):
     """
     Verify agreement integrity via hash comparison (POST method).
     """
-    service = _service(db)
     try:
         result = service.verify_agreement(
             agreement_id=request.agreement_id,
@@ -98,12 +89,11 @@ def verify_agreement_post(
 @router.get("/by-hash/{hash_value}")
 def lookup_by_hash(
     hash_value: str,
-    db: Session = Depends(get_db),
+    service: AgreementsService = Depends(get_agreements_service),
 ):
     """
     Look up agreement by hash value alone.
     """
-    service = _service(db)
     agreement = service.get_by_hash(hash_value)
     if not agreement:
         raise HTTPException(

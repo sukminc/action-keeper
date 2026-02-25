@@ -1,19 +1,15 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
-from sqlalchemy.orm import Session
 
-from app.db.session import get_db
-from app.repositories.agreements_repo import AgreementsRepo
-from app.repositories.artifacts_repo import AgreementArtifactsRepo
+from app.core.config import settings
+from app.core.container import get_agreements_service, get_events_repo
 from app.repositories.events_repo import EventsRepo
-from app.repositories.payments_repo import PaymentsRepo
-from app.schemas.agreement import AgreementRead, AgreementCreate
+from app.schemas.agreement import AgreementCreate, AgreementRead
 from app.schemas.event import EventRead
 from app.services.agreements_service import AgreementsService
 from app.utils.hash_utils import HASH_VERSION, generate_verification_url
@@ -21,18 +17,8 @@ from app.utils.hash_utils import HASH_VERSION, generate_verification_url
 router = APIRouter(prefix="/agreements", tags=["agreements"])
 
 
-def _service(db: Session) -> AgreementsService:
-    return AgreementsService(
-        AgreementsRepo(db),
-        EventsRepo(db),
-        payments_repo=PaymentsRepo(db),
-        artifacts_repo=AgreementArtifactsRepo(db),
-    )
-
-
 def _verification_base_url() -> str:
-    base = os.getenv("VERIFY_BASE_URL") or os.getenv("API_BASE_URL") or "http://localhost:8000"
-    return base.rstrip("/")
+    return settings.verify_base_url.rstrip("/")
 
 
 def _serialize_agreement(service: AgreementsService, agreement: Any) -> AgreementRead:
@@ -78,9 +64,8 @@ def _serialize_agreement(service: AgreementsService, agreement: Any) -> Agreemen
 @router.post("", response_model=AgreementRead, status_code=201)
 def create_agreement(
     data: AgreementCreate,
-    db: Session = Depends(get_db),
+    service: AgreementsService = Depends(get_agreements_service),
 ):
-    service = _service(db)
     try:
         agreement = service.create_agreement(data)
     except ValueError as exc:
@@ -91,9 +76,8 @@ def create_agreement(
 @router.get("/{agreement_id}", response_model=AgreementRead)
 def get_agreement(
     agreement_id: str,
-    db: Session = Depends(get_db),
+    service: AgreementsService = Depends(get_agreements_service),
 ) -> AgreementRead:
-    service = _service(db)
     agreement = service.get_by_id(agreement_id)
     if agreement is None:
         raise HTTPException(status_code=404, detail="Agreement not found")
@@ -104,9 +88,8 @@ def get_agreement(
 def list_agreements(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
-    db: Session = Depends(get_db),
+    service: AgreementsService = Depends(get_agreements_service),
 ) -> list[AgreementRead]:
-    service = _service(db)
     items = service.list(limit=limit, offset=offset)
     return [_serialize_agreement(service, item) for item in items]
 
@@ -114,13 +97,13 @@ def list_agreements(
 @router.get("/{agreement_id}/events", response_model=list[EventRead])
 def list_agreement_events(
     agreement_id: str,
-    db: Session = Depends(get_db),
+    service: AgreementsService = Depends(get_agreements_service),
+    events_repo: EventsRepo = Depends(get_events_repo),
 ) -> list[EventRead]:
-    service = _service(db)
     agreement = service.get_by_id(agreement_id)
     if not agreement:
         raise HTTPException(status_code=404, detail="Agreement not found")
-    events = EventsRepo(db).list_for_agreement(agreement_id)
+    events = events_repo.list_for_agreement(agreement_id)
     return [
         EventRead(
             id=str(evt.id),
@@ -136,9 +119,8 @@ def list_agreement_events(
 @router.get("/{agreement_id}/artifact")
 def download_agreement_artifact(
     agreement_id: str,
-    db: Session = Depends(get_db),
+    service: AgreementsService = Depends(get_agreements_service),
 ):
-    service = _service(db)
     artifact = service.get_artifact(agreement_id)
     if not artifact:
         raise HTTPException(status_code=404, detail="Artifact not found")
