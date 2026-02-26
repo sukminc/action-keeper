@@ -5,6 +5,14 @@ Mobile-first **poker staking agreement** app focused on **revenue-first MVP**:
 - Produce a **tamper-evident** receipt (hash + QR verify)
 - Monetize via **paid contract generation** (Stripe) and later add Trip Planner + affiliate
 
+## Product Positioning
+ActionKeeper is **DocuSign for poker staking**, built for players and backers who need:
+- fast agreement drafting before play starts
+- transparent negotiation history
+- verifiable receipt after both sides confirm
+
+The app is **free to install/use at entry level**, and monetizes agreement generation and workflow scale.
+
 ## MVP Scope (Phase 1: Poker Staking)
 **Primary feature:** Paid contract generation + verification  
 **Non-custodial:** ActionKeeper never holds funds; it standardizes agreements and provides proof artifacts.
@@ -19,6 +27,25 @@ Planned features by phase:
 - Phase 1 (Revenue MVP): Contract Builder → Pay → PDF + Hash + QR Verify → Vault/List
 - Phase 2: Trip Planner (budget + required % sale) + affiliate links
 - Phase 3: Verified Resume (optional, later)
+
+## Monetization Strategy (Future-Proof)
+Aligned with [VISION.md](VISION.md): revenue first, proof first, non-custodial.
+
+### Packaging
+- `Free`: install + limited contract creation + shared negotiation link
+- `Pay-per-contract`: one-off fee per finalized agreement/receipt (best for casual users)
+- `Pro Unlimited`: monthly/annual unlimited contracts + advanced logs/export
+- `Team/Stable`: multi-seat plan for coaches/stables/backing groups with admin analytics
+
+### Unit Economics Direction
+- Charge on value moment: **when agreement is finalized and receipt is generated**
+- Keep negotiation drafting friction low to maximize completion rate
+- Add optional add-ons later: priority support, compliance export, anchored proof tiers
+
+### Anti-Commoditization
+- Structured poker-specific terms (stake %, markup, bullet cap, payout basis)
+- Revision timeline + dual-confirmation audit trail
+- Receipt evidence package designed for poker dispute contexts
 
 ## Tech Stack
 - Frontend: Next.js (App Router), mobile-first web
@@ -58,7 +85,7 @@ Planned features by phase:
    Keep an eye on backend logs; 404s from the webhook or 402 responses from agreements indicate the payment flow is still being wired up.
 
 ### 2026-02-26 Snapshot
-- **Negotiation Workflow:** Fully implemented `Accept` and `Counter` logic. Buyers can now propose new terms or finalize drafts directly from the UI.
+- **Negotiation Workflow:** Shared contract room now supports turn-based `Accept / Counter / Decline`, live offer preview, and change-log rendering before lock.
 - **Infrastructure & Reliability:** 
   - Fixed Postgres password masking issue in Alembic.
   - Upgraded amount columns to `BigInteger` to support high-stakes buy-ins.
@@ -67,8 +94,8 @@ Planned features by phase:
   - Implemented Next.js Rewrite Proxy (`/api/*` -> `backend:8000`) to eliminate "Failed to fetch" browser security blocks.
   - Simplified backend CORS and added verbose debug logging.
 - **Frontend Refinement:** 
-  - Streamlined `ContractBuilder` for faster functional testing.
-  - Enhanced `AgreementVault` with interactive negotiation tools.
+  - Seller offer form polished for poker players (stake validation, buy-in currency affordance, calculated exposure preview).
+  - Buyer page repositioned as monitor/admin view; negotiation actions centralized in shared contract room.
 - **Artifacts:** PDF generation upgraded to `fpdf2` with a robust layout engine (QR logic temporarily disabled for testing focus).
 
 ---

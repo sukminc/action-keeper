@@ -103,6 +103,7 @@ export default function ContractBuilder() {
           payment_id: "offer-intent",
           agreement_type: "poker_staking",
           terms_version: "freezeout-v1",
+          proposer_label: terms.party_a_label,
           terms: {
             stake_pct: Number(terms.stake_pct || 0),
             buy_in_amount: buyInValue,
