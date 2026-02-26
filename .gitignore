@@ -26,3 +26,4 @@ yarn-error.log*
 # Docker volumes / local artifacts
 postgres_data/
 backend/app/static/
+backend/artifacts/agreements/
