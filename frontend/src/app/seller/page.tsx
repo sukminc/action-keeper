@@ -9,10 +9,9 @@ export default function SellerPage() {
     <main>
       <header className="hero" style={{ marginBottom: "1.5rem" }}>
         <span className="hero-badge">Seller · Player mode</span>
-        <h1 className="hero-title">Offer your action · no surprise edits.</h1>
+        <h1 className="hero-title">Create your poker staking offer.</h1>
         <p className="hero-subtitle">
-          Capture stake %, buy-ins, and payout basis. Share the draft so your backer can
-          review from the buyer page.
+          Set your terms once, send one shared contract link, and negotiate live with your backer.
         </p>
       </header>
       <section className="sections-stack">

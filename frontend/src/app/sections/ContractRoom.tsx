@@ -19,6 +19,8 @@ type Agreement = {
   pending_terms?: {
     stake_pct?: number;
     markup?: number;
+    payout_basis?: string;
+    bullet_cap?: number;
   };
 };
 
@@ -40,6 +42,8 @@ export default function ContractRoom({ agreementId }: ContractRoomProps) {
   const [selectedActor, setSelectedActor] = useState<string>("");
   const [counterStake, setCounterStake] = useState<string>("");
   const [counterMarkup, setCounterMarkup] = useState<string>("");
+  const [counterPayoutBasis, setCounterPayoutBasis] = useState<string>("gross_payout");
+  const [counterBulletCap, setCounterBulletCap] = useState<string>("1");
   const [counterNotes, setCounterNotes] = useState<string>("");
   const [events, setEvents] = useState<EventItem[]>([]);
 
@@ -60,6 +64,8 @@ export default function ContractRoom({ agreementId }: ContractRoomProps) {
       setAgreement(data);
       setCounterStake(String(data.pending_terms?.stake_pct ?? data.terms?.stake_pct ?? ""));
       setCounterMarkup(String(data.pending_terms?.markup ?? data.terms?.markup ?? "1.0"));
+      setCounterPayoutBasis(String(data.pending_terms?.payout_basis ?? data.terms?.payout_basis ?? "gross_payout"));
+      setCounterBulletCap(String(data.pending_terms?.bullet_cap ?? data.terms?.bullet_cap ?? "1"));
       if (!selectedActor) {
         setSelectedActor(data.party_b_label || data.party_a_label || "");
       }
@@ -135,12 +141,21 @@ export default function ContractRoom({ agreementId }: ContractRoomProps) {
     }
     const stake = Number(counterStake);
     const markup = Number(counterMarkup);
+    const bulletCap = Number(counterBulletCap);
     if (!Number.isFinite(stake) || stake <= 0) {
       setStatusMsg("Counter stake %를 올바르게 입력해 주세요.");
       return;
     }
+    if (stake < 1 || stake > 100) {
+      setStatusMsg("Counter stake %는 1~100 범위여야 합니다.");
+      return;
+    }
     if (!Number.isFinite(markup) || markup < 0.5 || markup > 2.0) {
       setStatusMsg("Counter markup은 0.5 ~ 2.0 사이여야 합니다.");
+      return;
+    }
+    if (!Number.isFinite(bulletCap) || bulletCap < 1) {
+      setStatusMsg("Bullet cap은 1 이상이어야 합니다.");
       return;
     }
     const apiBase = resolveApiBase();
@@ -153,6 +168,8 @@ export default function ContractRoom({ agreementId }: ContractRoomProps) {
           ...(agreement?.terms || {}),
           stake_pct: stake,
           markup,
+          payout_basis: counterPayoutBasis,
+          bullet_cap: bulletCap,
         },
         counter_notes: counterNotes || "Counter from contract room",
       }),
@@ -229,6 +246,9 @@ export default function ContractRoom({ agreementId }: ContractRoomProps) {
       </header>
 
       <div className="card secondary" style={{ padding: "0.9rem" }}>
+        <p className="status-text" style={{ margin: "0 0 0.35rem 0" }}>
+          Locked: player, backer, buy-in amount
+        </p>
         <p style={{ margin: 0 }}>
           Stake {agreement.terms?.stake_pct ?? "-"}% · Buy-in ${agreement.terms?.buy_in_amount ?? "-"} · Basis{" "}
           {agreement.terms?.payout_basis ?? "TBD"} · Markup {agreement.terms?.markup ?? "-"}x
@@ -270,6 +290,24 @@ export default function ContractRoom({ agreementId }: ContractRoomProps) {
           placeholder="Counter markup (0.5 - 2.0)"
           value={counterMarkup}
           onChange={(e) => setCounterMarkup(e.target.value)}
+        />
+        <select
+          className="form-field"
+          value={counterPayoutBasis}
+          onChange={(e) => setCounterPayoutBasis(e.target.value)}
+        >
+          <option value="gross_payout">Gross payout</option>
+          <option value="net_profit">Net profit</option>
+          <option value="diluted_total">Diluted total</option>
+        </select>
+        <input
+          className="form-field"
+          type="number"
+          min="1"
+          step="1"
+          placeholder="Counter bullet cap (1=freezeout)"
+          value={counterBulletCap}
+          onChange={(e) => setCounterBulletCap(e.target.value)}
         />
       </div>
       <textarea
@@ -350,7 +388,12 @@ export default function ContractRoom({ agreementId }: ContractRoomProps) {
                 <div key={evt.id} className="vault-card">
                   <p style={{ margin: 0 }}>{message}</p>
                   <p className="status-text" style={{ margin: "0.35rem 0 0" }}>
-                    {new Date(evt.created_at).toLocaleString()}
+                    {new Date(evt.created_at).toLocaleString("en-US", {
+                      timeZone: "America/New_York",
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    })}{" "}
+                    EST
                   </p>
                 </div>
               );

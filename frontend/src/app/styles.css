@@ -137,6 +137,23 @@ textarea:focus {
   transform: translateY(-1px);
 }
 
+.money-input-wrap {
+  position: relative;
+}
+
+.money-prefix {
+  position: absolute;
+  left: 0.9rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.money-input {
+  padding-left: 1.8rem;
+}
+
 .btn {
   border: none;
   border-radius: 999px;
