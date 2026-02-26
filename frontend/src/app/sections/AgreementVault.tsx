@@ -24,7 +24,9 @@ type Agreement = {
 
 export default function AgreementVault() {
   const [agreements, setAgreements] = useState<Agreement[]>([]);
-  const [filter, setFilter] = useState<"all" | "ready" | "countered">("all");
+  const [filter, setFilter] = useState<
+    "all" | "ready" | "countered" | "awaiting_confirmation" | "declined"
+  >("all");
   const [counteringId, setCounteringId] = useState<string | null>(null);
   const [counterStake, setCounterStake] = useState<string>("");
   const [counterNotes, setCounterNotes] = useState<string>("");
@@ -67,10 +69,16 @@ export default function AgreementVault() {
         body: JSON.stringify({ accepter_label: label }),
       });
       if (response.ok) {
-        setStatusMsg("Agreement accepted!");
+        const data = await response.json();
+        if (data.negotiation_state === "accepted") {
+          setStatusMsg("양측 확인 완료: Agreement가 활성화되었습니다.");
+        } else {
+          setStatusMsg("한쪽 확인 완료: 상대방 확인을 기다리는 중입니다.");
+        }
         load();
       } else {
-        setStatusMsg("Failed to accept agreement.");
+        const errorData = await response.json().catch(() => ({}));
+        setStatusMsg(`Failed to accept agreement: ${errorData.detail || response.status}`);
       }
     } catch (err) {
       setStatusMsg("Error accepting agreement.");
@@ -100,10 +108,35 @@ export default function AgreementVault() {
         setCounterNotes("");
         load();
       } else {
-        setStatusMsg("Failed to propose counter.");
+        const errorData = await response.json().catch(() => ({}));
+        setStatusMsg(`Failed to propose counter: ${errorData.detail || response.status}`);
       }
     } catch (err) {
       setStatusMsg("Error proposing counter.");
+    }
+  };
+
+  const handleDecline = async (agreement: Agreement) => {
+    const apiBase = resolveApiBase();
+    setStatusMsg(`Declining agreement ${agreement.id}...`);
+    try {
+      const response = await fetch(`${apiBase}/api/v1/agreements/${agreement.id}/decline`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer dev-token" },
+        body: JSON.stringify({
+          decliner_label: agreement.party_b_label || "Backer",
+          reason: "Backer declined in buyer vault",
+        }),
+      });
+      if (response.ok) {
+        setStatusMsg("Agreement declined.");
+        load();
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        setStatusMsg(`Failed to decline agreement: ${errorData.detail || response.status}`);
+      }
+    } catch (err) {
+      setStatusMsg("Error declining agreement.");
     }
   };
 
@@ -112,7 +145,13 @@ export default function AgreementVault() {
     if (filter === "ready") {
       return agreement.negotiation_state === "accepted";
     }
-    return agreement.negotiation_state === "countered";
+    if (filter === "countered") {
+      return agreement.negotiation_state === "countered";
+    }
+    if (filter === "awaiting_confirmation") {
+      return agreement.negotiation_state === "awaiting_confirmation";
+    }
+    return agreement.negotiation_state === "declined";
   });
 
   return (
@@ -146,6 +185,24 @@ export default function AgreementVault() {
           >
             Negotiating
           </button>
+          <button
+            onClick={() => setFilter("awaiting_confirmation")}
+            className="btn btn-outline"
+            style={
+              filter === "awaiting_confirmation"
+                ? { borderColor: "var(--accent-secondary)", color: "var(--accent-secondary)" }
+                : {}
+            }
+          >
+            Awaiting Confirm
+          </button>
+          <button
+            onClick={() => setFilter("declined")}
+            className="btn btn-outline"
+            style={filter === "declined" ? { borderColor: "var(--danger)", color: "var(--danger)" } : {}}
+          >
+            Declined
+          </button>
           <button onClick={load} className="btn btn-outline" style={{ padding: "0.55rem 1.2rem" }}>
             Refresh (v2)
           </button>
@@ -170,14 +227,14 @@ export default function AgreementVault() {
             </div>
             <div className="vault-actions" style={{ flexDirection: "column", alignItems: "flex-start", gap: "0.75rem" }}>
               <div className="pill-row" style={{ width: "100%" }}>
-                {agreement.negotiation_state !== "accepted" && (
+                {agreement.negotiation_state !== "accepted" && agreement.negotiation_state !== "declined" && (
                   <>
                     <button
                       onClick={() => handleAccept(agreement.id, agreement.party_b_label || "Backer")}
                       className="btn btn-secondary"
                       style={{ fontSize: "0.85rem" }}
                     >
-                      Accept Draft
+                      Accept
                     </button>
                     <button
                       onClick={() => {
@@ -188,6 +245,13 @@ export default function AgreementVault() {
                       style={{ fontSize: "0.85rem" }}
                     >
                       Counter
+                    </button>
+                    <button
+                      onClick={() => handleDecline(agreement)}
+                      className="btn btn-outline"
+                      style={{ fontSize: "0.85rem", borderColor: "var(--danger)", color: "var(--danger)" }}
+                    >
+                      Decline
                     </button>
                   </>
                 )}

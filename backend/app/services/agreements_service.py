@@ -10,7 +10,7 @@ from app.repositories.artifacts_repo import AgreementArtifactsRepo
 from app.repositories.events_repo import EventsRepo
 from app.repositories.payments_repo import PaymentsRepo
 from app.repositories.revisions_repo import AgreementRevisionsRepo
-from app.schemas.agreement import AgreementAccept, AgreementCounter, AgreementCreate
+from app.schemas.agreement import AgreementAccept, AgreementCounter, AgreementCreate, AgreementDecline
 from app.utils.hash_utils import HASH_VERSION, compute_agreement_hash, generate_verification_url
 
 
@@ -196,10 +196,14 @@ class AgreementsService:
         agreement = self.agreements_repo.get_by_id(agreement_id)
         if not agreement:
             raise ValueError(f"Agreement {agreement_id} not found")
+        if agreement.negotiation_state in {"accepted", "declined"}:
+            raise ValueError("Cannot counter a finalized agreement")
 
         agreement.pending_terms = data.terms
         agreement.last_proposed_by = data.proposer_label
         agreement.negotiation_state = "countered"
+        agreement.party_a_confirmed_at = None
+        agreement.party_b_confirmed_at = None
 
         # Update structured fields from counter terms
         updates = self._hydrate_structured_fields(data)
@@ -230,19 +234,29 @@ class AgreementsService:
         agreement = self.agreements_repo.get_by_id(agreement_id)
         if not agreement:
             raise ValueError(f"Agreement {agreement_id} not found")
+        if agreement.negotiation_state == "declined":
+            raise ValueError("Cannot accept a declined agreement")
 
         # If it was countered, use pending_terms as final terms
         if agreement.negotiation_state == "countered" and agreement.pending_terms:
             agreement.terms = agreement.pending_terms
 
-        agreement.negotiation_state = "accepted"
-        agreement.status = "active"
-
-        # Update confirmed_at
+        # Update confirmed_at for explicit party labels only
         if data.accepter_label == agreement.party_a_label:
             agreement.party_a_confirmed_at = datetime.now(timezone.utc)
         elif data.accepter_label == agreement.party_b_label:
             agreement.party_b_confirmed_at = datetime.now(timezone.utc)
+        else:
+            raise ValueError("accepter_label must match party_a_label or party_b_label")
+
+        # Agreement becomes active only after both parties confirm
+        both_confirmed = bool(agreement.party_a_confirmed_at and agreement.party_b_confirmed_at)
+        if both_confirmed:
+            agreement.negotiation_state = "accepted"
+            agreement.status = "active"
+        else:
+            agreement.negotiation_state = "awaiting_confirmation"
+            agreement.status = "draft"
 
         # Re-compute hash as terms might have changed
         hashable_data = agreement.get_hashable_data()
@@ -265,7 +279,42 @@ class AgreementsService:
         self.events_repo.append(
             agreement_id=agreement.id,
             event_type="agreement_accepted",
-            payload={"accepter": data.accepter_label},
+            payload={
+                "accepter": data.accepter_label,
+                "both_confirmed": both_confirmed,
+            },
+        )
+        return agreement
+
+    def decline_agreement(self, agreement_id: str, data: AgreementDecline) -> Agreement:
+        agreement = self.agreements_repo.get_by_id(agreement_id)
+        if not agreement:
+            raise ValueError(f"Agreement {agreement_id} not found")
+        if agreement.negotiation_state == "accepted":
+            raise ValueError("Cannot decline an accepted agreement")
+        if data.decliner_label not in {agreement.party_a_label, agreement.party_b_label}:
+            raise ValueError("decliner_label must match party_a_label or party_b_label")
+
+        agreement.negotiation_state = "declined"
+        agreement.status = "cancelled"
+        agreement.pending_terms = None
+
+        hashable_data = agreement.get_hashable_data()
+        agreement.hash = compute_agreement_hash(hashable_data)
+        self.agreements_repo.update(agreement)
+
+        if self.revisions_repo:
+            self.revisions_repo.append(
+                agreement_id=agreement.id,
+                status="declined",
+                terms_snapshot=agreement.terms,
+                proposer_label=data.decliner_label,
+            )
+
+        self.events_repo.append(
+            agreement_id=agreement.id,
+            event_type="agreement_declined",
+            payload={"decliner": data.decliner_label, "reason": data.reason},
         )
         return agreement
 
