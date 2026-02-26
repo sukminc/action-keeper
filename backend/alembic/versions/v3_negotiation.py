@@ -5,8 +5,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = "20260225_negotiation_fields"
-down_revision = "20260225_add_payments_and_artifacts"
+revision = "v3_negotiation"
+down_revision = "v2_payments"
 branch_labels = None
 depends_on = None
 
@@ -44,7 +44,7 @@ def upgrade() -> None:
     )
     op.add_column(
         "agreements",
-        sa.Column("buy_in_amount_cents", sa.Integer(), nullable=True),
+        sa.Column("buy_in_amount_cents", sa.BigInteger(), nullable=True),
     )
     op.add_column(
         "agreements",

@@ -7,10 +7,8 @@ const initialTerms = {
   buy_in_amount: "",
   markup: "1.0",
   payout_basis: "gross_payout",
-  event_date: "",
   party_a_label: "",
   party_b_label: "",
-  notes: "",
 };
 
 const payoutBasisLabels: Record<string, string> = {
@@ -22,9 +20,8 @@ const payoutBasisLabels: Record<string, string> = {
 export default function ContractBuilder() {
   const [terms, setTerms] = useState(initialTerms);
   const [status, setStatus] = useState<string | null>(null);
-  const [playerResponse, setPlayerResponse] = useState<"accept" | "counter" | "none">("none");
-  const [responseNotes, setResponseNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
   const handleTermsChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
@@ -37,7 +34,6 @@ export default function ContractBuilder() {
     if (!terms.party_b_label) missing.push("Backer name");
     if (!terms.stake_pct) missing.push("Stake %");
     if (!terms.buy_in_amount) missing.push("Buy-in amount");
-    if (!terms.event_date) missing.push("Event date");
     const markup = parseFloat(terms.markup || "1");
     if (Number.isNaN(markup) || markup < 0.5 || markup > 2) {
       missing.push("Markup between 0.5× and 2.0×");
@@ -51,21 +47,15 @@ export default function ContractBuilder() {
     }
     const stake = terms.stake_pct || "___";
     const buyIn = terms.buy_in_amount ? `$${terms.buy_in_amount}` : "$____";
-    const eventDay = terms.event_date || "event date TBA";
     const basis = payoutBasisLabels[terms.payout_basis] || "payout basis TBD";
     const markup = parseFloat(terms.markup || "1").toFixed(2);
-    return `${terms.party_a_label || "Player"} offers ${stake}% in a ${buyIn} freeze-out (${eventDay}) at ${markup}× markup. ${
+    return `${terms.party_a_label || "Player"} offers ${stake}% in a ${buyIn} freeze-out at ${markup}× markup. ${
       terms.party_b_label || "Backer"
     } receives ${stake || "___"}% of ${basis}.`;
   }, [terms]);
 
   const resolveApiBase = () => {
-    if (process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL.length > 0) {
-      return process.env.NEXT_PUBLIC_API_URL;
-    }
-    if (typeof window !== "undefined") {
-      return window.location.origin;
-    }
+    // Use relative path so Next.js rewrites can handle it
     return "";
   };
 
@@ -75,14 +65,12 @@ export default function ContractBuilder() {
       return;
     }
     const apiBase = resolveApiBase();
-    if (!apiBase) {
-      setStatus("API base URL is missing. Set NEXT_PUBLIC_API_URL.");
-      return;
-    }
     setIsSubmitting(true);
     setStatus("Sending offer to backer...");
+    const url = `${apiBase}/api/v1/agreements`;
     try {
-      const response = await fetch(`${apiBase}/api/v1/agreements`, {
+      console.log(`Sending request to: ${url}`);
+      const response = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer dev-token" },
         body: JSON.stringify({
@@ -95,25 +83,21 @@ export default function ContractBuilder() {
             bullet_cap: 1,
             markup: parseFloat(terms.markup || "1"),
             payout_basis: terms.payout_basis,
-            event_date: terms.event_date,
             party_a_label: terms.party_a_label,
             party_b_label: terms.party_b_label,
-            notes: terms.notes,
-            player_response: playerResponse,
-            response_notes: responseNotes || undefined,
           },
         }),
       });
       const data = await response.json();
       if (!response.ok) {
+        console.error("API Error:", data);
         throw new Error(data.detail || "Offer failed");
       }
       setStatus(`Offer ${data.id} queued. Share the link so ${terms.party_b_label || "your backer"} can respond.`);
       setTerms(initialTerms);
-      setPlayerResponse("none");
-      setResponseNotes("");
     } catch (err) {
-      setStatus((err as Error).message);
+      console.error("Fetch Error:", err);
+      setStatus(`Error hitting ${url}: ${(err as Error).message}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -123,7 +107,7 @@ export default function ContractBuilder() {
     <section className="card accent" style={{ display: "flex", flexDirection: "column", gap: "1.1rem" }}>
       <header className="card-header">
         <h2 className="card-title">Player Offer Composer</h2>
-        <p className="card-subtitle">Freeze-out template: max 1 bullet, single event date, markup 0.5×–2×.</p>
+        <p className="card-subtitle">Freeze-out template: max 1 bullet, markup 0.5×–2×.</p>
       </header>
       <div className="form-grid">
         <input
@@ -187,23 +171,7 @@ export default function ContractBuilder() {
             </option>
           ))}
         </select>
-        <input
-          name="event_date"
-          type="date"
-          placeholder="Event date"
-          value={terms.event_date}
-          onChange={handleTermsChange}
-          className="form-field"
-        />
       </div>
-      <textarea
-        name="notes"
-        placeholder="Extra clauses (markup explanation, swap notes, etc.)"
-        value={terms.notes}
-        onChange={handleTermsChange}
-        className="form-field"
-        style={{ minHeight: "90px" }}
-      />
       <div className="card secondary" style={{ padding: "1rem" }}>
         <p className="card-title" style={{ fontSize: "1rem" }}>
           Offer preview
@@ -214,46 +182,13 @@ export default function ContractBuilder() {
           sides agree.
         </p>
       </div>
-      <div className="card" style={{ padding: "1rem" }}>
-        <p className="card-title" style={{ fontSize: "1rem" }}>
-          Respond to a backer counter (optional)
-        </p>
-        <p className="status-text">
-          If David counters from the buyer hub, pick how you want to respond before sending a fresh draft.
-        </p>
-        <div className="pill-row" style={{ width: "100%" }}>
-          <button
-            onClick={() => setPlayerResponse("accept")}
-            className="btn btn-secondary"
-            style={playerResponse === "accept" ? { border: "1px solid var(--success)" } : {}}
-          >
-            Accept Counter
-          </button>
-          <button
-            onClick={() => setPlayerResponse("counter")}
-            className="btn btn-outline"
-            style={playerResponse === "counter" ? { border: "1px solid var(--accent)" } : {}}
-          >
-            Counter Again
-          </button>
-        </div>
-        {playerResponse === "counter" && (
-          <textarea
-            className="form-field"
-            style={{ marginTop: "0.75rem" }}
-            placeholder="Describe your counter (e.g., 5% net but extend payouts by 7 days)."
-            value={responseNotes}
-            onChange={(e) => setResponseNotes(e.target.value)}
-          />
-        )}
-      </div>
       <button
         onClick={sendOffer}
         className="btn btn-primary"
         style={{ width: "100%" }}
         disabled={isSubmitting}
       >
-        {isSubmitting ? "Sending…" : "Send Offer to Backer"}
+        {isSubmitting ? "Sending…" : "Send Offer to Backer (v2)"}
       </button>
       {status && <p className="status-text">{status}</p>}
     </section>

@@ -23,6 +23,16 @@ class AgreementCreate(BaseModel):
     funds_logged_at: Optional[datetime] = None
 
 
+class AgreementCounter(BaseModel):
+    proposer_label: str
+    terms: Dict[str, Any]
+    counter_notes: Optional[str] = None
+
+
+class AgreementAccept(BaseModel):
+    accepter_label: str
+
+
 class AgreementArtifactRead(BaseModel):
     verification_url: str
     hash_snapshot: str
@@ -55,5 +65,3 @@ class AgreementRead(BaseModel):
     party_b_confirmed_at: Optional[datetime] = None
     funds_logged_at: Optional[datetime] = None
     created_at: Optional[datetime] = None
-    qr_payload: Optional[Dict[str, Any]] = None
-    artifact: Optional[AgreementArtifactRead] = None

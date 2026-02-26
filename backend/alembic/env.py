@@ -19,7 +19,7 @@ target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
-    url = str(app_engine.url)
+    url = app_engine.url.render_as_string(hide_password=False)
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -36,7 +36,7 @@ def run_migrations_online() -> None:
         config.get_section(config.config_ini_section),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
-        url=str(app_engine.url),
+        url=app_engine.url.render_as_string(hide_password=False),
     )
 
     with connectable.connect() as connection:

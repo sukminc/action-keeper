@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse
 from app.core.config import settings
 from app.core.container import get_agreements_service, get_events_repo
 from app.repositories.events_repo import EventsRepo
-from app.schemas.agreement import AgreementCreate, AgreementRead
+from app.schemas.agreement import AgreementAccept, AgreementCounter, AgreementCreate, AgreementRead
 from app.schemas.event import EventRead
 from app.services.agreements_service import AgreementsService
 from app.utils.hash_utils import HASH_VERSION, generate_verification_url
@@ -22,28 +22,6 @@ def _verification_base_url() -> str:
 
 
 def _serialize_agreement(service: AgreementsService, agreement: Any) -> AgreementRead:
-    qr_payload = None
-    artifact_payload = None
-    if getattr(agreement, "hash", None):
-        verification_url = generate_verification_url(
-            str(agreement.id),
-            agreement.hash,
-            _verification_base_url(),
-        )
-        qr_payload = {
-            "version": agreement.hash_version or HASH_VERSION,
-            "hash": agreement.hash,
-            "agreement_id": str(agreement.id),
-            "verification_url": verification_url,
-        }
-        artifact = service.get_artifact(str(agreement.id))
-        if artifact:
-            artifact_payload = {
-                "verification_url": artifact.verification_url,
-                "hash_snapshot": artifact.hash_snapshot,
-                "file_path": artifact.file_path,
-            }
-
     return AgreementRead.model_validate(
         {
             "id": str(agreement.id),
@@ -51,12 +29,24 @@ def _serialize_agreement(service: AgreementsService, agreement: Any) -> Agreemen
             "terms_version": agreement.terms_version,
             "terms": agreement.terms,
             "status": agreement.status,
+            "negotiation_state": agreement.negotiation_state,
+            "pending_terms": agreement.pending_terms,
+            "last_proposed_by": agreement.last_proposed_by,
             "payment_id": agreement.payment_id,
             "hash": agreement.hash,
             "hash_version": agreement.hash_version,
+            "payout_basis": agreement.payout_basis,
+            "stake_percent": agreement.stake_percent,
+            "buy_in_amount_cents": agreement.buy_in_amount_cents,
+            "bullet_cap": agreement.bullet_cap,
+            "event_date": agreement.event_date,
+            "due_date": agreement.due_date,
+            "party_a_label": agreement.party_a_label,
+            "party_b_label": agreement.party_b_label,
+            "party_a_confirmed_at": agreement.party_a_confirmed_at,
+            "party_b_confirmed_at": agreement.party_b_confirmed_at,
+            "funds_logged_at": agreement.funds_logged_at,
             "created_at": agreement.created_at,
-            "qr_payload": qr_payload,
-            "artifact": artifact_payload,
         }
     )
 
@@ -70,6 +60,32 @@ def create_agreement(
         agreement = service.create_agreement(data)
     except ValueError as exc:
         raise HTTPException(status_code=402, detail=str(exc))
+    return _serialize_agreement(service, agreement)
+
+
+@router.post("/{agreement_id}/counter", response_model=AgreementRead)
+def counter_agreement(
+    agreement_id: str,
+    data: AgreementCounter,
+    service: AgreementsService = Depends(get_agreements_service),
+):
+    try:
+        agreement = service.propose_counter(agreement_id, data)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    return _serialize_agreement(service, agreement)
+
+
+@router.post("/{agreement_id}/accept", response_model=AgreementRead)
+def accept_agreement(
+    agreement_id: str,
+    data: AgreementAccept,
+    service: AgreementsService = Depends(get_agreements_service),
+):
+    try:
+        agreement = service.accept_agreement(agreement_id, data)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
     return _serialize_agreement(service, agreement)
 
 

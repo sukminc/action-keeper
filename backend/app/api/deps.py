@@ -27,6 +27,10 @@ async def enforce_rate_limit(request: Request) -> None:
 
 
 async def require_api_token(request: Request, _: None = Depends(enforce_rate_limit)) -> None:
+    # Development bypass
+    if settings.is_dev:
+        return
+
     token = settings.api_token
     if not token:
         return

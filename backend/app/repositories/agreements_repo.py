@@ -117,3 +117,9 @@ class AgreementsRepo:
         return self.session.query(Agreement).filter(
             Agreement.hash == hash_value
         ).first()
+
+    def update(self, agreement: Agreement) -> Agreement:
+        self.session.add(agreement)
+        self.session.commit()
+        self.session.refresh(agreement)
+        return agreement

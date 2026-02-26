@@ -10,7 +10,7 @@ from app.repositories.artifacts_repo import AgreementArtifactsRepo
 from app.repositories.events_repo import EventsRepo
 from app.repositories.payments_repo import PaymentsRepo
 from app.repositories.revisions_repo import AgreementRevisionsRepo
-from app.schemas.agreement import AgreementCreate
+from app.schemas.agreement import AgreementAccept, AgreementCounter, AgreementCreate
 from app.utils.hash_utils import HASH_VERSION, compute_agreement_hash, generate_verification_url
 
 
@@ -34,50 +34,103 @@ class AgreementsService:
     def _ensure_payment_ready(self, payment_id: Optional[str]) -> None:
         if not payment_id:
             raise ValueError("payment_id is required for agreement creation")
+        
+        # Development bypass for placeholder intents
+        if settings.is_dev and payment_id == "offer-intent":
+            return
+
         if not self.payments_repo:
             raise ValueError("Payments repository not configured")
         payment = self.payments_repo.get(payment_id)
         if not payment or payment.status != "paid":
             raise ValueError("Payment is required before generating agreement")
 
-    def _hydrate_structured_fields(self, data: AgreementCreate) -> None:
-        terms = data.terms or {}
-        if data.stake_percent is None and "stake_pct" in terms:
+    def _hydrate_structured_fields(self, data: Any, terms: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Extract structured fields from terms and return them.
+        If data is an object, it also tries to set attributes if they are None.
+        """
+        if terms is None:
+            terms = getattr(data, "terms", {}) or {}
+        
+        updates = {}
+        
+        # Payout Basis
+        payout_basis = getattr(data, "payout_basis", None)
+        if payout_basis in (None, ""):
+            payout_basis = terms.get("payout_basis")
+        if payout_basis:
+            updates["payout_basis"] = payout_basis
+            
+        # Stake Percent
+        stake_pct = getattr(data, "stake_percent", None)
+        if stake_pct is None and "stake_pct" in terms:
             try:
-                data.stake_percent = float(terms["stake_pct"])
+                stake_pct = float(terms["stake_pct"])
             except (TypeError, ValueError):
-                data.stake_percent = None
-        if data.buy_in_amount_cents is None and "buy_in_amount" in terms:
+                pass
+        if stake_pct is not None:
+            updates["stake_percent"] = stake_pct
+
+        # Buy-in Amount
+        buy_in = getattr(data, "buy_in_amount_cents", None)
+        if buy_in is None and "buy_in_amount" in terms:
             try:
-                data.buy_in_amount_cents = int(round(float(terms["buy_in_amount"]) * 100))
+                buy_in = int(round(float(terms["buy_in_amount"]) * 100))
             except (TypeError, ValueError):
-                data.buy_in_amount_cents = None
-        if data.bullet_cap is None and "bullet_cap" in terms:
+                pass
+        if buy_in is not None:
+            updates["buy_in_amount_cents"] = buy_in
+
+        # Bullet Cap
+        bullet_cap = getattr(data, "bullet_cap", None)
+        if bullet_cap is None and "bullet_cap" in terms:
             try:
-                data.bullet_cap = int(terms["bullet_cap"])
+                bullet_cap = int(terms["bullet_cap"])
             except (TypeError, ValueError):
-                data.bullet_cap = None
-        if data.payout_basis in (None, "") and terms.get("payout_basis"):
-            data.payout_basis = terms["payout_basis"]
-        if data.party_a_label is None and terms.get("party_a_label"):
-            data.party_a_label = terms["party_a_label"]
-        if data.party_b_label is None and terms.get("party_b_label"):
-            data.party_b_label = terms["party_b_label"]
-        if data.event_date is None and terms.get("event_date"):
+                pass
+        if bullet_cap is not None:
+            updates["bullet_cap"] = bullet_cap
+
+        # Labels
+        party_a = getattr(data, "party_a_label", None) or terms.get("party_a_label")
+        if party_a: updates["party_a_label"] = party_a
+        
+        party_b = getattr(data, "party_b_label", None) or terms.get("party_b_label")
+        if party_b: updates["party_b_label"] = party_b
+
+        # Dates
+        event_date = getattr(data, "event_date", None)
+        if event_date is None and terms.get("event_date"):
             try:
-                data.event_date = datetime.fromisoformat(terms["event_date"]).date()
+                event_date = datetime.fromisoformat(terms["event_date"]).date()
             except (TypeError, ValueError):
-                data.event_date = None
-        if data.due_date is None and terms.get("due_date"):
+                pass
+        if event_date: updates["event_date"] = event_date
+
+        due_date = getattr(data, "due_date", None)
+        if due_date is None and terms.get("due_date"):
             try:
-                data.due_date = datetime.fromisoformat(terms["due_date"]).date()
+                due_date = datetime.fromisoformat(terms["due_date"]).date()
             except (TypeError, ValueError):
-                data.due_date = None
-        if data.funds_logged_at is None and terms.get("funds_received_at"):
+                pass
+        if due_date: updates["due_date"] = due_date
+
+        # Funds Logged
+        funds_at = getattr(data, "funds_logged_at", None)
+        if funds_at is None and terms.get("funds_received_at"):
             try:
-                data.funds_logged_at = datetime.fromisoformat(terms["funds_received_at"])
+                funds_at = datetime.fromisoformat(terms["funds_received_at"])
             except (TypeError, ValueError):
-                data.funds_logged_at = None
+                pass
+        if funds_at: updates["funds_logged_at"] = funds_at
+
+        # If data is an object and has these attributes, set them if they are currently None
+        for key, val in updates.items():
+            if hasattr(data, key) and getattr(data, key) is None:
+                setattr(data, key, val)
+                
+        return updates
 
     def create_agreement(self, data: AgreementCreate) -> Agreement:
         """
@@ -137,6 +190,83 @@ class AgreementsService:
                 payload={"timestamp": agreement.funds_logged_at.isoformat()},
             )
 
+        return agreement
+
+    def propose_counter(self, agreement_id: str, data: AgreementCounter) -> Agreement:
+        agreement = self.agreements_repo.get_by_id(agreement_id)
+        if not agreement:
+            raise ValueError(f"Agreement {agreement_id} not found")
+
+        agreement.pending_terms = data.terms
+        agreement.last_proposed_by = data.proposer_label
+        agreement.negotiation_state = "countered"
+
+        # Update structured fields from counter terms
+        updates = self._hydrate_structured_fields(data)
+        for key, val in updates.items():
+            setattr(agreement, key, val)
+
+        self.agreements_repo.update(agreement)
+
+        if self.revisions_repo:
+            self.revisions_repo.append(
+                agreement_id=agreement.id,
+                status="countered",
+                terms_snapshot=data.terms,
+                proposer_label=data.proposer_label,
+            )
+
+        self.events_repo.append(
+            agreement_id=agreement.id,
+            event_type="negotiation_countered",
+            payload={
+                "proposer": data.proposer_label,
+                "counter_notes": data.counter_notes,
+            },
+        )
+        return agreement
+
+    def accept_agreement(self, agreement_id: str, data: AgreementAccept) -> Agreement:
+        agreement = self.agreements_repo.get_by_id(agreement_id)
+        if not agreement:
+            raise ValueError(f"Agreement {agreement_id} not found")
+
+        # If it was countered, use pending_terms as final terms
+        if agreement.negotiation_state == "countered" and agreement.pending_terms:
+            agreement.terms = agreement.pending_terms
+
+        agreement.negotiation_state = "accepted"
+        agreement.status = "active"
+
+        # Update confirmed_at
+        if data.accepter_label == agreement.party_a_label:
+            agreement.party_a_confirmed_at = datetime.now(timezone.utc)
+        elif data.accepter_label == agreement.party_b_label:
+            agreement.party_b_confirmed_at = datetime.now(timezone.utc)
+
+        # Re-compute hash as terms might have changed
+        hashable_data = agreement.get_hashable_data()
+        agreement.hash = compute_agreement_hash(hashable_data)
+
+        self.agreements_repo.update(agreement)
+
+        # Re-generate artifact
+        if self.artifacts_repo:
+            self._create_artifact(agreement)
+
+        if self.revisions_repo:
+            self.revisions_repo.append(
+                agreement_id=agreement.id,
+                status="accepted",
+                terms_snapshot=agreement.terms,
+                proposer_label=data.accepter_label,
+            )
+
+        self.events_repo.append(
+            agreement_id=agreement.id,
+            event_type="agreement_accepted",
+            payload={"accepter": data.accepter_label},
+        )
         return agreement
 
     def _create_artifact(self, agreement: Agreement) -> None:

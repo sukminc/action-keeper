@@ -1,35 +1,22 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
-from typing import Any, Dict, Iterable
+from typing import Any, Dict
+
+from fpdf import FPDF
+from fpdf.enums import XPos, YPos
 
 
-def _escape(text: str) -> str:
-    return text.replace("\\", r"\\").replace("(", r"\(").replace(")", r"\)")
+class AgreementPDF(FPDF):
+    def header(self):
+        self.set_font("Helvetica", "B", 16)
+        self.cell(0, 10, "ActionKeeper Agreement Receipt", align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        self.ln(5)
 
-
-def _lines_from_terms(terms: Dict[str, Any]) -> Iterable[str]:
-    for key in sorted(terms.keys()):
-        value = terms[key]
-        if isinstance(value, dict):
-            yield f"- {key}:"
-            for inner_line in _lines_from_terms(value):
-                yield f"  {inner_line}"
-        else:
-            yield f"- {key}: {value}"
-
-
-def _build_content(lines: list[tuple[str, int, float]]) -> str:
-    cursor_y = 792 - 72
-    ops = ["BT"]
-    for text, size, leading in lines:
-        cursor_y -= leading
-        ops.append(f"/F1 {size} Tf")
-        ops.append(f"1 0 0 1 72 {cursor_y:.2f} Tm")
-        ops.append(f"({_escape(text)}) Tj")
-    ops.append("ET")
-    return "\n".join(ops)
+    def footer(self):
+        self.set_y(-15)
+        self.set_font("Helvetica", "I", 8)
+        self.cell(0, 10, f"Page {self.page_no()}/{{nb}}", align="C")
 
 
 def render_agreement_pdf(
@@ -45,49 +32,51 @@ def render_agreement_pdf(
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     file_path = Path(output_dir) / f"{agreement_id}.pdf"
 
-    lines: list[tuple[str, int, float]] = []
-    lines.append(("ActionKeeper Agreement Receipt", 20, 32.0))
-    lines.append((f"Agreement ID: {agreement_id}", 12, 18.0))
-    lines.append((f"Type: {agreement_type}", 12, 14.0))
-    lines.append((f"Status: {status}", 12, 14.0))
-    lines.append((f"Hash: {hash_value}", 12, 14.0))
-    lines.append(("Verification URL:", 12, 16.0))
-    lines.append((verification_url, 10, 12.0))
-    lines.append(("Terms:", 12, 18.0))
-    for term_line in _lines_from_terms(terms):
-        lines.append((term_line, 10, 12.0))
+    pdf = AgreementPDF()
+    pdf.alias_nb_pages()
+    pdf.add_page()
+    
+    # Basic Info
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 10, f"Agreement ID: {agreement_id}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    
+    pdf.set_font("Helvetica", "", 12)
+    pdf.cell(0, 8, f"Type: {agreement_type}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.cell(0, 8, f"Status: {status}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    
+    pdf.ln(5)
+    
+    # Verification Info
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 10, "Verification Info:", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    
+    pdf.set_font("Helvetica", "", 10)
+    # Use a fixed safe width (e.g., 180mm) instead of 0 to avoid space calculation errors
+    pdf.multi_cell(180, 8, f"Hash: {hash_value}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    
+    pdf.set_font("Helvetica", "I", 8)
+    pdf.multi_cell(180, 6, f"URL: {verification_url}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
-    content_stream = _build_content(lines)
-    content_bytes = content_stream.encode("latin-1")
+    pdf.ln(10)
 
-    objects = [
-        "<< /Type /Catalog /Pages 2 0 R >>",
-        "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>",
-        f"<< /Length {len(content_bytes)} >>\nstream\n{content_stream}\nendstream",
-        "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-    ]
+    # Terms
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 10, "Agreement Terms:", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    
+    pdf.set_font("Helvetica", "", 10)
 
-    pdf_parts = ["%PDF-1.4\n"]
-    offsets: list[int] = []
-    for idx, obj in enumerate(objects, start=1):
-        offsets.append(sum(len(part.encode("latin-1")) for part in pdf_parts))
-        pdf_parts.append(f"{idx} 0 obj\n{obj}\nendobj\n")
-    pdf_body = "".join(pdf_parts)
-    xref_offset = len(pdf_body.encode("latin-1"))
-    xref_lines = [
-        "xref",
-        f"0 {len(objects) + 1}",
-        "0000000000 65535 f \n",
-    ]
-    for off in offsets:
-        xref_lines.append(f"{off:010d} 00000 n \n")
-    xref_lines.append("trailer")
-    xref_lines.append(f"<< /Size {len(objects)+1} /Root 1 0 R >>")
-    xref_lines.append("startxref")
-    xref_lines.append(str(xref_offset))
-    xref_lines.append("%%EOF")
-    pdf_data = pdf_body + "\n".join(xref_lines)
+    def add_terms(data, indent=0):
+        for key in sorted(data.keys()):
+            val = data[key]
+            prefix = "  " * indent + "- "
+            if isinstance(val, dict):
+                pdf.cell(0, 8, f"{prefix}{key}:", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                add_terms(val, indent + 1)
+            else:
+                text = f"{prefix}{key}: {val}"
+                pdf.multi_cell(180, 8, text, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
-    file_path.write_bytes(pdf_data.encode("latin-1"))
+    add_terms(terms)
+
+    pdf.output(str(file_path))
     return file_path

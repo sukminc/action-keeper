@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import JSON, Date, DateTime, Float, Integer, String, func
+from sqlalchemy import JSON, BigInteger, Date, DateTime, Float, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -62,7 +62,7 @@ class Agreement(Base):
         default="gross_payout",
     )
     stake_percent: Mapped[float | None] = mapped_column(Float, nullable=True)
-    buy_in_amount_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    buy_in_amount_cents: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     bullet_cap: Mapped[int | None] = mapped_column(Integer, nullable=True)
     event_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     due_date: Mapped[date | None] = mapped_column(Date, nullable=True)

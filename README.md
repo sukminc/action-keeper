@@ -57,15 +57,37 @@ Planned features by phase:
    - `GET /api/v1/agreements` and `/api/v1/agreements/{id}/artifact`
    Keep an eye on backend logs; 404s from the webhook or 402 responses from agreements indicate the payment flow is still being wired up.
 
-### 2026-02-25 Snapshot
-- **Negotiation-ready schema & migrations:** ORM models now capture payout basis, markup, event dates, counter metadata, and funds logs. The Alembic migration (`20260225_negotiation_fields`) creates these columns plus an `agreement_revisions` table. Running the migration still blocks on aligning Postgres credentials, so the backend currently fails with `psycopg.OperationalError: password authentication failed for user "admin"` until the DB volume is recreated with `POSTGRES_PASSWORD=postgres`.
-- **Frontend split by persona:** `/seller` hosts the Player Offer Composer (freeze-out template, markup slider, counter-response notes) while `/buyer` renders the Agreement Vault with filters. “Send Offer” now submits a single request; payment buttons were removed pending real checkout integration.
-- **Open issues:** 
-  - Postgres password alignment remains unresolved; follow the volume reset steps above if migrations fail.
-  - Buyer-side counters are not yet wired to the backend; the UI only provides guidance/placeholders.
-  - QR receipts still render text-only verification URLs; embedding an actual QR image is scoped for the next iteration once artifacts regenerate successfully.
+### 2026-02-26 Snapshot
+- **Negotiation Workflow:** Fully implemented `Accept` and `Counter` logic. Buyers can now propose new terms or finalize drafts directly from the UI.
+- **Infrastructure & Reliability:** 
+  - Fixed Postgres password masking issue in Alembic.
+  - Upgraded amount columns to `BigInteger` to support high-stakes buy-ins.
+  - Repaired and shortened migration history for stable environment setup.
+- **Connectivity & CORS:** 
+  - Implemented Next.js Rewrite Proxy (`/api/*` -> `backend:8000`) to eliminate "Failed to fetch" browser security blocks.
+  - Simplified backend CORS and added verbose debug logging.
+- **Frontend Refinement:** 
+  - Streamlined `ContractBuilder` for faster functional testing.
+  - Enhanced `AgreementVault` with interactive negotiation tools.
+- **Artifacts:** PDF generation upgraded to `fpdf2` with a robust layout engine (QR logic temporarily disabled for testing focus).
 
 ---
+## Running Locally
+1. Ensure Docker Desktop is running.
+2. `cp .env.example .env` (the defaults work with the provided docker-compose).
+3. Apply migrations:
+   ```bash
+   docker compose up -d db
+   # Wait a few seconds for DB to be healthy
+   docker compose run --rm backend alembic upgrade head
+   ```
+4. Start the full stack:
+   ```bash
+   docker compose up -d
+   ```
+5. Verify health:
+   - API: `http://localhost:8000/api/v1/health`
+   - UI: `http://localhost:3000`
 ## Repository Structure
 
 This repository is a lightweight monorepo with a clear separation between **backend domain logic** and **frontend mobile-first UI**.  

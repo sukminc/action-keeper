@@ -1,6 +1,4 @@
 import AgreementVault from "../sections/AgreementVault";
-import VerificationCTA from "../sections/VerificationCTA";
-import "../styles.css";
 
 export const metadata = {
   title: "ActionKeeper · Buyer",
@@ -19,7 +17,6 @@ export default function BuyerPage() {
       </header>
       <section className="sections-stack">
         <AgreementVault />
-        <VerificationCTA />
       </section>
     </main>
   );

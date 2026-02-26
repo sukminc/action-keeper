@@ -5,12 +5,18 @@ import { useEffect, useState } from "react";
 type Agreement = {
   id: string;
   status: string;
+  negotiation_state: string;
+  party_a_label?: string;
+  party_b_label?: string;
+  stake_percent?: number;
   terms?: {
     stake_pct?: number;
     payout_basis?: string;
     buy_in_amount?: number;
     bullet_cap?: number;
     event_date?: string;
+    party_a_label?: string;
+    party_b_label?: string;
   };
   qr_payload?: { verification_url: string };
   artifact?: { verification_url: string };
@@ -19,25 +25,31 @@ type Agreement = {
 export default function AgreementVault() {
   const [agreements, setAgreements] = useState<Agreement[]>([]);
   const [filter, setFilter] = useState<"all" | "ready" | "countered">("all");
+  const [counteringId, setCounteringId] = useState<string | null>(null);
+  const [counterStake, setCounterStake] = useState<string>("");
+  const [counterNotes, setCounterNotes] = useState<string>("");
+  const [statusMsg, setStatusMsg] = useState<string | null>(null);
 
   const resolveApiBase = () => {
-    if (process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL.length > 0) {
-      return process.env.NEXT_PUBLIC_API_URL;
-    }
-    if (typeof window !== "undefined") {
-      return window.location.origin;
-    }
     return "";
   };
 
   const load = async () => {
     const apiBase = resolveApiBase();
-    if (!apiBase) return;
-    const response = await fetch(`${apiBase}/api/v1/agreements`, {
-      headers: { Authorization: "Bearer dev-token" },
-    });
-    if (response.ok) {
-      setAgreements(await response.json());
+    const url = `${apiBase}/api/v1/agreements`;
+    try {
+      const response = await fetch(url, {
+        headers: { Authorization: "Bearer dev-token" },
+      });
+      if (response.ok) {
+        setAgreements(await response.json());
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        setStatusMsg(`Failed to load from ${url}: ${response.status} ${JSON.stringify(errorData)}`);
+      }
+    } catch (err) {
+      console.error("Load Error:", err);
+      setStatusMsg(`Error loading from ${url}: ${(err as Error).message}`);
     }
   };
 
@@ -45,12 +57,62 @@ export default function AgreementVault() {
     load();
   }, []);
 
+  const handleAccept = async (id: string, label: string) => {
+    const apiBase = resolveApiBase();
+    setStatusMsg(`Accepting agreement ${id}...`);
+    try {
+      const response = await fetch(`${apiBase}/api/v1/agreements/${id}/accept`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer dev-token" },
+        body: JSON.stringify({ accepter_label: label }),
+      });
+      if (response.ok) {
+        setStatusMsg("Agreement accepted!");
+        load();
+      } else {
+        setStatusMsg("Failed to accept agreement.");
+      }
+    } catch (err) {
+      setStatusMsg("Error accepting agreement.");
+    }
+  };
+
+  const handleCounter = async (agreement: Agreement) => {
+    const apiBase = resolveApiBase();
+    setStatusMsg(`Sending counter for ${agreement.id}...`);
+    try {
+      const response = await fetch(`${apiBase}/api/v1/agreements/${agreement.id}/counter`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer dev-token" },
+        body: JSON.stringify({
+          proposer_label: agreement.party_b_label || "Backer",
+          terms: {
+            ...agreement.terms,
+            stake_pct: Number(counterStake),
+          },
+          counter_notes: counterNotes,
+        }),
+      });
+      if (response.ok) {
+        setStatusMsg("Counter proposed!");
+        setCounteringId(null);
+        setCounterStake("");
+        setCounterNotes("");
+        load();
+      } else {
+        setStatusMsg("Failed to propose counter.");
+      }
+    } catch (err) {
+      setStatusMsg("Error proposing counter.");
+    }
+  };
+
   const filteredAgreements = agreements.filter((agreement) => {
     if (filter === "all") return true;
     if (filter === "ready") {
-      return agreement.status === "awaiting_confirmation" || agreement.status === "accepted";
+      return agreement.negotiation_state === "accepted";
     }
-    return agreement.status === "countered";
+    return agreement.negotiation_state === "countered";
   });
 
   return (
@@ -82,44 +144,84 @@ export default function AgreementVault() {
             className="btn btn-outline"
             style={filter === "countered" ? { borderColor: "var(--danger)", color: "var(--danger)" } : {}}
           >
-            Needs Change
+            Negotiating
           </button>
           <button onClick={load} className="btn btn-outline" style={{ padding: "0.55rem 1.2rem" }}>
-            Refresh
+            Refresh (v2)
           </button>
         </div>
       </header>
+      {statusMsg && <p className="status-text" style={{ color: "var(--accent)" }}>{statusMsg}</p>}
       <div className="vault-list">
         {filteredAgreements.map((agreement) => (
           <div key={agreement.id} className="vault-card">
             <div style={{ marginBottom: "0.65rem" }}>
               <p style={{ fontWeight: 600, margin: 0 }}>#{agreement.id}</p>
               <p className="status-text" style={{ textTransform: "capitalize" }}>
-                Status: {agreement.status}
+                State: {agreement.negotiation_state} ({agreement.status})
               </p>
               {agreement.terms && (
                 <p className="status-text" style={{ marginTop: "0.35rem" }}>
-                  {agreement.terms.stake_pct ?? "–"}% · {agreement.terms.payout_basis ?? "basis TBD"} · Buy-in $
-                  {agreement.terms.buy_in_amount ?? "–"} · Bullets {agreement.terms.bullet_cap ?? "–"} · Event{" "}
+                  {agreement.stake_percent ?? agreement.terms.stake_pct ?? "–"}% · {agreement.terms.payout_basis ?? "basis TBD"} · Buy-in $
+                  {agreement.terms.buy_in_amount ?? "–"} · Event{" "}
                   {agreement.terms.event_date ?? "TBD"}
                 </p>
               )}
             </div>
-            <div className="vault-actions">
-              {agreement.status === "countered" && (
-                <span className="status-text" style={{ color: "var(--danger)" }}>
-                  Player requests change. Reply via your buyer tools (API or upcoming UI).
-                </span>
-              )}
-              {agreement.qr_payload && (
-                <a href={agreement.qr_payload.verification_url} className="link">
-                  Open Verify Link
-                </a>
-              )}
-              {agreement.artifact && (
-                <a href={agreement.artifact.verification_url} className="link">
-                  Download Receipt PDF
-                </a>
+            <div className="vault-actions" style={{ flexDirection: "column", alignItems: "flex-start", gap: "0.75rem" }}>
+              <div className="pill-row" style={{ width: "100%" }}>
+                {agreement.negotiation_state !== "accepted" && (
+                  <>
+                    <button
+                      onClick={() => handleAccept(agreement.id, agreement.party_b_label || "Backer")}
+                      className="btn btn-secondary"
+                      style={{ fontSize: "0.85rem" }}
+                    >
+                      Accept Draft
+                    </button>
+                    <button
+                      onClick={() => {
+                        setCounteringId(agreement.id);
+                        setCounterStake(String(agreement.stake_percent || agreement.terms?.stake_pct || ""));
+                      }}
+                      className="btn btn-outline"
+                      style={{ fontSize: "0.85rem" }}
+                    >
+                      Counter
+                    </button>
+                  </>
+                )}
+              </div>
+
+              {counteringId === agreement.id && (
+                <div className="card secondary" style={{ width: "100%", padding: "0.75rem", marginTop: "0.5rem" }}>
+                  <p className="card-title" style={{ fontSize: "0.9rem" }}>Propose Counter</p>
+                  <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.5rem" }}>
+                    <input
+                      type="number"
+                      placeholder="New Stake %"
+                      value={counterStake}
+                      onChange={(e) => setCounterStake(e.target.value)}
+                      className="form-field"
+                      style={{ flex: 1 }}
+                    />
+                  </div>
+                  <textarea
+                    placeholder="Counter notes..."
+                    value={counterNotes}
+                    onChange={(e) => setCounterNotes(e.target.value)}
+                    className="form-field"
+                    style={{ width: "100%", minHeight: "60px", marginBottom: "0.5rem" }}
+                  />
+                  <div className="pill-row">
+                    <button onClick={() => handleCounter(agreement)} className="btn btn-primary" style={{ padding: "0.4rem 0.8rem", fontSize: "0.8rem" }}>
+                      Submit Counter
+                    </button>
+                    <button onClick={() => setCounteringId(null)} className="btn btn-outline" style={{ padding: "0.4rem 0.8rem", fontSize: "0.8rem" }}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
           </div>

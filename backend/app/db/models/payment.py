@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, JSON, String, func
+from sqlalchemy import BigInteger, DateTime, Integer, JSON, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -16,7 +16,7 @@ class Payment(Base):
         default=lambda: str(uuid.uuid4()),
     )
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending", index=True)
-    amount_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    amount_cents: Mapped[int] = mapped_column(BigInteger, nullable=False)
     currency: Mapped[str] = mapped_column(String(10), nullable=False, default="usd")
     stripe_session_id: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
     agreement_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)

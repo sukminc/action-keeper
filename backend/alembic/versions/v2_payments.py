@@ -5,8 +5,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = "20260225_add_payments_and_artifacts"
-down_revision = None
+revision = "v2_payments"
+down_revision = "v1_initial"
 branch_labels = None
 depends_on = None
 
@@ -26,7 +26,7 @@ def upgrade() -> None:
         "payments",
         sa.Column("id", sa.String(length=36), primary_key=True),
         sa.Column("status", sa.String(length=20), nullable=False),
-        sa.Column("amount_cents", sa.Integer(), nullable=False),
+        sa.Column("amount_cents", sa.BigInteger(), nullable=False),
         sa.Column("currency", sa.String(length=10), nullable=False, server_default="usd"),
         sa.Column("stripe_session_id", sa.String(length=64), nullable=False, unique=True),
         sa.Column("agreement_id", sa.String(length=36), nullable=True),
