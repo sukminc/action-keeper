@@ -8,11 +8,10 @@ export default function BuyerPage() {
   return (
     <main>
       <header className="hero" style={{ marginBottom: "1.5rem" }}>
-        <span className="hero-badge">Buyer · Player mode</span>
-        <h1 className="hero-title">Review, counter, and confirm payouts.</h1>
+        <span className="hero-badge">Buyer · Monitor mode</span>
+        <h1 className="hero-title">Track contracts before receipt lock.</h1>
         <p className="hero-subtitle">
-          Scroll through pending drafts, verify payout basis, and open tamper-evident receipts once both sides
-          lock the terms.
+          This page is an admin-style monitor. Open each shared contract room to negotiate terms turn-by-turn.
         </p>
       </header>
       <section className="sections-stack">

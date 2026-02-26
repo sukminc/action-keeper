@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 type Agreement = {
   id: string;
   status: string;
   negotiation_state: string;
+  last_proposed_by?: string;
   party_a_label?: string;
   party_b_label?: string;
   terms?: {
@@ -14,11 +15,12 @@ type Agreement = {
     payout_basis?: string;
     buy_in_amount?: number;
     bullet_cap?: number;
-    event_date?: string;
   };
   pending_terms?: {
     stake_pct?: number;
     markup?: number;
+    payout_basis?: string;
+    bullet_cap?: number;
   };
 };
 
@@ -38,12 +40,48 @@ export default function ContractRoom({ agreementId }: ContractRoomProps) {
   const [loading, setLoading] = useState(true);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [selectedActor, setSelectedActor] = useState<string>("");
+
   const [counterStake, setCounterStake] = useState<string>("");
   const [counterMarkup, setCounterMarkup] = useState<string>("");
+  const [counterPayoutBasis, setCounterPayoutBasis] = useState<string>("gross_payout");
+  const [counterBulletCap, setCounterBulletCap] = useState<string>("1");
   const [counterNotes, setCounterNotes] = useState<string>("");
+  const [isCounterEditing, setIsCounterEditing] = useState(false);
+
   const [events, setEvents] = useState<EventItem[]>([]);
 
   const resolveApiBase = () => "";
+
+  const actorChoices = useMemo(() => {
+    const values = [agreement?.party_a_label, agreement?.party_b_label].filter(Boolean) as string[];
+    return Array.from(new Set(values));
+  }, [agreement?.party_a_label, agreement?.party_b_label]);
+
+  const nextCounterActor = useMemo(() => {
+    if (!agreement) return "";
+    const a = agreement.party_a_label || "";
+    const b = agreement.party_b_label || "";
+    if (!a || !b) return "";
+    const last = agreement.last_proposed_by || "";
+    if (!last || last === a) return b;
+    if (last === b) return a;
+    return "";
+  }, [agreement]);
+
+  const canAct = Boolean(selectedActor && actorChoices.includes(selectedActor));
+  const canCounterByTurn = !nextCounterActor || selectedActor === nextCounterActor;
+  const isLocked = agreement?.negotiation_state === "accepted" || agreement?.negotiation_state === "declined";
+
+  const previewTerms = useMemo(() => {
+    if (!agreement) return null;
+    return {
+      stake_pct: Number(counterStake || agreement.terms?.stake_pct || 0),
+      markup: Number(counterMarkup || agreement.terms?.markup || 1),
+      payout_basis: counterPayoutBasis || agreement.terms?.payout_basis || "gross_payout",
+      bullet_cap: Number(counterBulletCap || agreement.terms?.bullet_cap || 1),
+      buy_in_amount: Number(agreement.terms?.buy_in_amount || 0),
+    };
+  }, [agreement, counterStake, counterMarkup, counterPayoutBasis, counterBulletCap]);
 
   const loadAgreement = async () => {
     const apiBase = resolveApiBase();
@@ -60,6 +98,8 @@ export default function ContractRoom({ agreementId }: ContractRoomProps) {
       setAgreement(data);
       setCounterStake(String(data.pending_terms?.stake_pct ?? data.terms?.stake_pct ?? ""));
       setCounterMarkup(String(data.pending_terms?.markup ?? data.terms?.markup ?? "1.0"));
+      setCounterPayoutBasis(String(data.pending_terms?.payout_basis ?? data.terms?.payout_basis ?? "gross_payout"));
+      setCounterBulletCap(String(data.pending_terms?.bullet_cap ?? data.terms?.bullet_cap ?? "1"));
       if (!selectedActor) {
         setSelectedActor(data.party_b_label || data.party_a_label || "");
       }
@@ -69,12 +109,6 @@ export default function ContractRoom({ agreementId }: ContractRoomProps) {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    loadAgreement();
-    const timer = setInterval(loadAgreement, 5000);
-    return () => clearInterval(timer);
-  }, [agreementId]);
 
   const loadEvents = async () => {
     const apiBase = resolveApiBase();
@@ -86,22 +120,20 @@ export default function ContractRoom({ agreementId }: ContractRoomProps) {
       const data = await response.json();
       setEvents(data);
     } catch {
-      // Keep silent for non-critical timeline fetch errors
+      // non-critical
     }
   };
 
   useEffect(() => {
+    loadAgreement();
     loadEvents();
-    const timer = setInterval(loadEvents, 5000);
-    return () => clearInterval(timer);
+    const agreementTimer = setInterval(loadAgreement, 5000);
+    const eventsTimer = setInterval(loadEvents, 5000);
+    return () => {
+      clearInterval(agreementTimer);
+      clearInterval(eventsTimer);
+    };
   }, [agreementId]);
-
-  const actorChoices = useMemo(() => {
-    const values = [agreement?.party_a_label, agreement?.party_b_label].filter(Boolean) as string[];
-    return Array.from(new Set(values));
-  }, [agreement?.party_a_label, agreement?.party_b_label]);
-
-  const canAct = Boolean(selectedActor && actorChoices.includes(selectedActor));
 
   const submitAccept = async () => {
     if (!canAct) {
@@ -123,9 +155,10 @@ export default function ContractRoom({ agreementId }: ContractRoomProps) {
     setStatusMsg(
       data.negotiation_state === "accepted"
         ? "양측 합의 완료: Agreement가 active 상태입니다."
-        : "한쪽만 확인 완료: 상대방의 Accept를 기다리는 중입니다."
+        : "한쪽 확인 완료: 상대방의 Accept를 기다리는 중입니다."
     );
     await loadAgreement();
+    await loadEvents();
   };
 
   const submitCounter = async () => {
@@ -133,16 +166,27 @@ export default function ContractRoom({ agreementId }: ContractRoomProps) {
       setStatusMsg("먼저 acting party를 선택해 주세요.");
       return;
     }
+    if (!canCounterByTurn) {
+      setStatusMsg(`지금은 ${nextCounterActor} 님 차례입니다.`);
+      return;
+    }
+
     const stake = Number(counterStake);
     const markup = Number(counterMarkup);
-    if (!Number.isFinite(stake) || stake <= 0) {
-      setStatusMsg("Counter stake %를 올바르게 입력해 주세요.");
+    const bulletCap = Number(counterBulletCap);
+    if (!Number.isFinite(stake) || stake < 1 || stake > 100) {
+      setStatusMsg("Counter stake %는 1~100 범위여야 합니다.");
       return;
     }
     if (!Number.isFinite(markup) || markup < 0.5 || markup > 2.0) {
       setStatusMsg("Counter markup은 0.5 ~ 2.0 사이여야 합니다.");
       return;
     }
+    if (!Number.isFinite(bulletCap) || bulletCap < 1) {
+      setStatusMsg("Bullet cap은 1 이상이어야 합니다.");
+      return;
+    }
+
     const apiBase = resolveApiBase();
     const response = await fetch(`${apiBase}/api/v1/agreements/${agreementId}/counter`, {
       method: "POST",
@@ -153,16 +197,23 @@ export default function ContractRoom({ agreementId }: ContractRoomProps) {
           ...(agreement?.terms || {}),
           stake_pct: stake,
           markup,
+          payout_basis: counterPayoutBasis,
+          bullet_cap: bulletCap,
         },
         counter_notes: counterNotes || "Counter from contract room",
       }),
     });
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       setStatusMsg(`Counter failed: ${errorData.detail || response.status}`);
       return;
     }
-    setStatusMsg("Counter sent.");
+
+    const nextActor = actorChoices.find((actor) => actor !== selectedActor);
+    setIsCounterEditing(false);
+    setStatusMsg(nextActor ? `Counter sent. Next turn: ${nextActor}` : "Counter sent.");
+    if (nextActor) setSelectedActor(nextActor);
     await loadAgreement();
     await loadEvents();
   };
@@ -211,13 +262,8 @@ export default function ContractRoom({ agreementId }: ContractRoomProps) {
     URL.revokeObjectURL(url);
   };
 
-  if (loading) {
-    return <p className="status-text">Loading contract...</p>;
-  }
-
-  if (!agreement) {
-    return <p className="status-text">Contract not found.</p>;
-  }
+  if (loading) return <p className="status-text">Loading contract...</p>;
+  if (!agreement) return <p className="status-text">Contract not found.</p>;
 
   return (
     <section className="card accent" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
@@ -226,27 +272,15 @@ export default function ContractRoom({ agreementId }: ContractRoomProps) {
         <p className="card-subtitle">
           Agreement #{agreement.id} · State {agreement.negotiation_state} ({agreement.status})
         </p>
-      </header>
-
-      <div className="card secondary" style={{ padding: "0.9rem" }}>
-        <p style={{ margin: 0 }}>
-          Stake {agreement.terms?.stake_pct ?? "-"}% · Buy-in ${agreement.terms?.buy_in_amount ?? "-"} · Basis{" "}
-          {agreement.terms?.payout_basis ?? "TBD"} · Markup {agreement.terms?.markup ?? "-"}x
-        </p>
-        {agreement.pending_terms?.stake_pct !== undefined && (
-          <p className="status-text" style={{ margin: "0.4rem 0 0" }}>
-            Pending counter: stake {agreement.pending_terms.stake_pct}% / markup{" "}
-            {agreement.pending_terms.markup ?? "-"}x
+        {nextCounterActor && !isLocked && (
+          <p className="status-text" style={{ marginTop: "0.45rem" }}>
+            Next counter turn: {nextCounterActor}
           </p>
         )}
-      </div>
+      </header>
 
       <div className="form-grid" style={{ marginBottom: 0 }}>
-        <select
-          className="form-field"
-          value={selectedActor}
-          onChange={(e) => setSelectedActor(e.target.value)}
-        >
+        <select className="form-field" value={selectedActor} onChange={(e) => setSelectedActor(e.target.value)}>
           <option value="">Select acting party</option>
           {actorChoices.map((actor) => (
             <option key={actor} value={actor}>
@@ -254,67 +288,112 @@ export default function ContractRoom({ agreementId }: ContractRoomProps) {
             </option>
           ))}
         </select>
-        <input
-          className="form-field"
-          type="number"
-          placeholder="Counter stake %"
-          value={counterStake}
-          onChange={(e) => setCounterStake(e.target.value)}
-        />
-        <input
-          className="form-field"
-          type="number"
-          step="0.1"
-          min="0.5"
-          max="2.0"
-          placeholder="Counter markup (0.5 - 2.0)"
-          value={counterMarkup}
-          onChange={(e) => setCounterMarkup(e.target.value)}
-        />
       </div>
-      <textarea
-        className="form-field"
-        placeholder="Counter notes (optional)"
-        value={counterNotes}
-        onChange={(e) => setCounterNotes(e.target.value)}
-      />
+
+      {previewTerms && (
+        <div className="card secondary" style={{ padding: "0.9rem" }}>
+          <p className="card-title" style={{ fontSize: "1rem", marginBottom: "0.45rem" }}>
+            Live Offer Preview (before lock)
+          </p>
+          <p style={{ margin: 0 }}>
+            Stake {previewTerms.stake_pct}% · Buy-in ${previewTerms.buy_in_amount} · Markup {previewTerms.markup}x · Basis{" "}
+            {previewTerms.payout_basis} · Bullet cap {previewTerms.bullet_cap}
+          </p>
+          <p className="status-text" style={{ margin: "0.45rem 0 0" }}>
+            Backer exposure: $
+            {((previewTerms.buy_in_amount * previewTerms.stake_pct) / 100).toLocaleString("en-US", {
+              maximumFractionDigits: 2,
+            })}
+          </p>
+        </div>
+      )}
 
       <div className="pill-row">
-        <button
-          className="btn btn-secondary"
-          onClick={submitAccept}
-          disabled={agreement.negotiation_state === "accepted" || agreement.negotiation_state === "declined"}
-        >
+        <button className="btn btn-secondary" onClick={submitAccept} disabled={isLocked}>
           Accept
         </button>
         <button
           className="btn btn-outline"
-          onClick={submitCounter}
-          disabled={agreement.negotiation_state === "accepted" || agreement.negotiation_state === "declined"}
+          onClick={() => {
+            setIsCounterEditing((prev) => !prev);
+            setStatusMsg(null);
+          }}
+          disabled={isLocked || !canCounterByTurn}
         >
-          Counter
+          {isCounterEditing ? "Close Counter Edit" : "Counter"}
         </button>
         <button
           className="btn btn-outline"
           onClick={submitDecline}
           style={{ borderColor: "var(--danger)", color: "var(--danger)" }}
-          disabled={agreement.negotiation_state === "accepted" || agreement.negotiation_state === "declined"}
+          disabled={isLocked}
         >
           Decline
         </button>
-        <button
-          className="btn btn-primary"
-          onClick={downloadReceipt}
-          disabled={agreement.negotiation_state !== "accepted"}
-        >
-          Download Receipt
-        </button>
+        {agreement.negotiation_state === "accepted" && (
+          <button className="btn btn-primary" onClick={downloadReceipt}>
+            Download Receipt
+          </button>
+        )}
       </div>
 
+      {isCounterEditing && (
+        <div className="card secondary" style={{ padding: "0.9rem" }}>
+          <p className="card-title" style={{ fontSize: "1rem", marginBottom: "0.55rem" }}>
+            Counter Edit
+          </p>
+          <div className="form-grid" style={{ marginBottom: "0.5rem" }}>
+            <input
+              className="form-field"
+              type="number"
+              placeholder="Counter stake %"
+              value={counterStake}
+              onChange={(e) => setCounterStake(e.target.value)}
+            />
+            <input
+              className="form-field"
+              type="number"
+              step="0.1"
+              min="0.5"
+              max="2.0"
+              placeholder="Counter markup (0.5 - 2.0)"
+              value={counterMarkup}
+              onChange={(e) => setCounterMarkup(e.target.value)}
+            />
+            <select
+              className="form-field"
+              value={counterPayoutBasis}
+              onChange={(e) => setCounterPayoutBasis(e.target.value)}
+            >
+              <option value="gross_payout">Gross payout</option>
+              <option value="net_profit">Net profit</option>
+              <option value="diluted_total">Diluted total</option>
+            </select>
+            <input
+              className="form-field"
+              type="number"
+              min="1"
+              step="1"
+              placeholder="Counter bullet cap (1=freezeout)"
+              value={counterBulletCap}
+              onChange={(e) => setCounterBulletCap(e.target.value)}
+            />
+          </div>
+          <textarea
+            className="form-field"
+            placeholder="Counter notes (optional)"
+            value={counterNotes}
+            onChange={(e) => setCounterNotes(e.target.value)}
+          />
+          <div className="pill-row" style={{ marginTop: "0.6rem" }}>
+            <button className="btn btn-primary" onClick={submitCounter} disabled={!canCounterByTurn || isLocked}>
+              Send Counter Update
+            </button>
+          </div>
+        </div>
+      )}
+
       {statusMsg && <p className="status-text">{statusMsg}</p>}
-      <a className="link" href={`/contract/${agreement.id}`}>
-        Share this URL: /contract/{agreement.id}
-      </a>
 
       <div className="card secondary" style={{ padding: "0.9rem" }}>
         <p className="card-title" style={{ fontSize: "1rem", marginBottom: "0.5rem" }}>
@@ -327,30 +406,47 @@ export default function ContractRoom({ agreementId }: ContractRoomProps) {
             .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
             .map((evt) => {
               const payload = evt.payload || {};
-              let message = evt.event_type;
+              let messageNode: ReactNode = evt.event_type;
               if (evt.event_type === "negotiation_countered") {
                 const proposer = String(payload.proposer || "Unknown");
                 const changes = (payload.term_changes as Record<string, { from: unknown; to: unknown }>) || {};
-                const changeText = Object.entries(changes)
-                  .map(([k, v]) => `${k}: ${String(v.from ?? "-")} -> ${String(v.to ?? "-")}`)
-                  .join(", ");
-                message = `${proposer} countered${changeText ? ` (${changeText})` : ""}`;
+                messageNode = (
+                  <span>
+                    <strong>{proposer}</strong> countered{" "}
+                    {Object.keys(changes).length > 0 && (
+                      <>
+                        :{" "}
+                        {Object.entries(changes).map(([k, v], idx) => (
+                          <span key={`${evt.id}-${k}`}>
+                            {idx > 0 ? ", " : ""}
+                            {k} <s>{String(v.from ?? "-")}</s> -&gt; <strong>{String(v.to ?? "-")}</strong>
+                          </span>
+                        ))}
+                      </>
+                    )}
+                  </span>
+                );
               } else if (evt.event_type === "agreement_accepted") {
                 const accepter = String(payload.accepter || "Unknown");
                 const both = Boolean(payload.both_confirmed);
-                message = `${accepter} accepted${both ? " (fully agreed)" : " (waiting for other party)"}`;
+                messageNode = `${accepter} accepted${both ? " (fully agreed)" : " (waiting for other party)"}`;
               } else if (evt.event_type === "agreement_declined") {
                 const decliner = String(payload.decliner || "Unknown");
                 const reason = String(payload.reason || "");
-                message = `${decliner} declined${reason ? ` (${reason})` : ""}`;
+                messageNode = `${decliner} declined${reason ? ` (${reason})` : ""}`;
               } else if (evt.event_type === "agreement_created") {
-                message = "Agreement created";
+                messageNode = "Agreement created";
               }
               return (
                 <div key={evt.id} className="vault-card">
-                  <p style={{ margin: 0 }}>{message}</p>
+                  <p style={{ margin: 0 }}>{messageNode}</p>
                   <p className="status-text" style={{ margin: "0.35rem 0 0" }}>
-                    {new Date(evt.created_at).toLocaleString()}
+                    {new Date(evt.created_at).toLocaleString("en-US", {
+                      timeZone: "America/New_York",
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    })}{" "}
+                    ET
                   </p>
                 </div>
               );
