@@ -85,151 +85,42 @@ Aligned with [VISION.md](VISION.md): revenue first, proof first, non-custodial.
    Keep an eye on backend logs; 404s from the webhook or 402 responses from agreements indicate the payment flow is still being wired up.
 
 ### 2026-02-26 Snapshot
-- **Negotiation Workflow:** Shared contract room now supports turn-based `Accept / Counter / Decline`, live offer preview, and change-log rendering before lock.
+- **Negotiation Workflow:** Fully implemented shared contract room supporting turn-based `Accept / Counter / Decline` logic. Supports dual-confirmation, visual diffs of term changes, and a persistent activity feed/audit trail.
 - **Infrastructure & Reliability:** 
-  - Fixed Postgres password masking issue in Alembic.
-  - Upgraded amount columns to `BigInteger` to support high-stakes buy-ins.
-  - Repaired and shortened migration history for stable environment setup.
-- **Connectivity & CORS:** 
-  - Implemented Next.js Rewrite Proxy (`/api/*` -> `backend:8000`) to eliminate "Failed to fetch" browser security blocks.
-  - Simplified backend CORS and added verbose debug logging.
+  - Implemented **Next.js Rewrite Proxy** (`/api/*` -> `backend:8000`) to eliminate CORS issues and simplify frontend-backend connectivity.
+  - Upgraded amount columns to `BigInteger` for high-stakes support.
+  - Stabilized Alembic migrations up to `v3_negotiation`.
 - **Frontend Refinement:** 
-  - Seller offer form polished for poker players (stake validation, buy-in currency affordance, calculated exposure preview).
-  - Buyer page repositioned as monitor/admin view; negotiation actions centralized in shared contract room.
-- **Artifacts:** PDF generation upgraded to `fpdf2` with a robust layout engine (QR logic temporarily disabled for testing focus).
-
----
-## Running Locally
-1. Ensure Docker Desktop is running.
-2. `cp .env.example .env` (the defaults work with the provided docker-compose).
-3. Apply migrations:
-   ```bash
-   docker compose up -d db
-   # Wait a few seconds for DB to be healthy
-   docker compose run --rm backend alembic upgrade head
-   ```
-4. Start the full stack:
-   ```bash
-   docker compose up -d
-   ```
-5. Verify health:
-   - API: `http://localhost:8000/api/v1/health`
-   - UI: `http://localhost:3000`
-## Repository Structure
-
-This repository is a lightweight monorepo with a clear separation between **backend domain logic** and **frontend mobile-first UI**.  
-It is designed for **TDD-first development**, SQLite-safe testing, and future PostgreSQL production deployment.
-
-### Full tree
-
-```bash
-tree -a -I 'node_modules|.next|__pycache__|.pytest_cache|.venv|.git'
-.
-├── .env.example
-├── .gitignore
-├── .vscode
-│   └── settings.json
-├── README.md
-├── backend
-│   ├── Dockerfile
-│   ├── app
-│   │   ├── __init__.py
-│   │   ├── api
-│   │   │   └── v1
-│   │   │       ├── __init__.py
-│   │   │       ├── agreements.py
-│   │   │       └── health.py
-│   │   ├── db
-│   │   │   ├── __init__.py
-│   │   │   ├── base.py
-│   │   │   ├── models
-│   │   │   │   ├── __init__.py
-│   │   │   │   ├── agreement.py
-│   │   │   │   └── event.py
-│   │   │   ├── session.py
-│   │   │   └── types.py
-│   │   ├── main.py
-│   │   ├── repositories
-│   │   │   ├── __init__.py
-│   │   │   ├── agreements_repo.py
-│   │   │   └── events_repo.py
-│   │   ├── schemas
-│   │   │   ├── __init__.py
-│   │   │   └── agreement.py
-│   │   └── services
-│   │       ├── __init__.py
-│   │       └── agreements_service.py
-│   ├── app.db
-│   ├── pytest.ini
-│   ├── requirements.txt
-│   └── tests
-│       ├── __init__.py
-│       ├── conftest.py
-│       ├── test_agreements_api.py
-│       ├── test_agreements_repo.py
-│       ├── test_agreements_service.py
-│       ├── test_events_repo.py
-│       └── test_health.py
-├── docker-compose.yml
-└── frontend
-    ├── Dockerfile
-    ├── next-env.d.ts
-    ├── next.config.js
-    ├── package-lock.json
-    ├── package.json
-    ├── src
-    │   └── app
-    │       ├── layout.tsx
-    │       └── page.tsx
-    └── tsconfig.json
-```
-
-### Directory responsibilities
-
-**Repo root**
-- `.env.example`: environment variable template
-- `docker-compose.yml`: local orchestration for backend + frontend
-- `.vscode/`: editor configuration for consistent linting and testing
-
-**Backend (`backend/`)**
-- `app/main.py`: FastAPI application entrypoint
-- `app/api/v1/`: versioned HTTP endpoints
-- `app/schemas/`: Pydantic request/response contracts
-- `app/repositories/`: persistence layer (DB access only, no business rules)
-- `app/services/`: service layer (business rules; orchestrates repositories)
-- `app/db/`: database configuration and SQLAlchemy setup
-  - `base.py`: Declarative Base
-  - `types.py`: dialect-safe types (SQLite tests / Postgres prod)
-  - `models/`: ORM table definitions (single source of truth)
-- `tests/`: pytest suite (SQLite in-memory)
-- `requirements.txt`: backend dependencies
-
-**Frontend (`frontend/`)**
-- `src/app/`: Next.js App Router
-- `layout.tsx`: root layout
-- `page.tsx`: landing page
-- `Dockerfile`: frontend container build
-
-This structure enforces strict separation between API, persistence, and UI, and supports incremental TDD-driven expansion (payments, trip planner, generic P2P agreements).
+  - Polished Seller/Buyer interfaces for poker-specific terminology (stake %, bullet caps, markup).
+  - Real-time payout scenario previews in the Contract Room.
+- **Artifacts:** Successfully transitioned to `fpdf2` for deterministic PDF generation. 
 
 ---
 
 ## Current Progress
 
-**Status as of today (2026-02-25):**
+**Status as of today (2026-02-26):**
 
 | Part | Status | Notes |
 | --- | --- | --- |
 | 1 — Foundation | ✅ Stable | Monorepo + health check verified locally. |
 | 2 — Domain Models | ✅ Stable | Agreements/events repositories pass unit tests. |
 | 3 — Service Layer | ✅ Stable | Business rules + event emission implemented. |
-| 4 — API Contracts | ✅ Stable | CRUD endpoints live, protected by `Authorization: Bearer dev-token`. Counter-offer workflow is tracked in the backlog. |
-| 5 — Tamper-Evident Receipt | ⚠️ In progress | Hashing + verify endpoint exist, but QR codes are text-only and still waiting on visual rendering plus Prod verification tests. |
-| 6 — PDF Artifact Generation | ⚠️ In progress | Deterministic PDFs save to `ARTIFACTS_DIR`, yet migrations must run before `agreement_id` → artifact lookups succeed. |
-| 7 — Payments (Revenue MVP) | ⚠️ In progress | Checkout/webhook services are scaffolded, but the `payments` tables and `agreements.payment_id` column require the Alembic migration; until that lands, `/api/v1/agreements` returns HTTP 402/500. |
-| 8 — Mobile Contract Builder | ⚠️ In progress | Seller/Buyer pages exist (player offer composer + buyer vault), but counters and backend wiring are pending. |
+| 4 — API Contracts | ✅ Stable | CRUD + Negotiation endpoints (Accept/Counter) live. |
+| 5 — Tamper-Evident Receipt | ✅ Stable | SHA-256 hashing + public verification logic implemented. |
+| 6 — PDF Artifact Generation | ✅ Stable | Transitioned to `fpdf2`; deterministic PDFs stored in `ARTIFACTS_DIR`. |
+| 7 — Payments (Revenue MVP) | ⚠️ Partial | Stripe scaffolding (Checkout/Webhooks) exists but uses simulated session IDs. |
+| 8 — Mobile Contract Builder | ✅ Stable | Functional Seller/Buyer mobile UI with negotiation flow. |
 | 9 — Audit & Ops | 🚧 Not started | Rate limiting, structured logging, auth hardening queued. |
-|10 — Expansion Hooks | 🚧 Not started | Trip Planner + affiliate scaffolding queued. |
+| 10 — Expansion Hooks | 🚧 In Progress | Trip Planner scaffolding and basic budget logic implemented. |
+
+## Current Blockers & Gaps
+- **Authentication:** The system currently relies on a hardcoded `dev-token`. Integration of a real identity provider (e.g., NextAuth, Firebase, or Clerk) is required for production.
+- **Production Payments:** Stripe integration requires real API keys and a production-grade checkout flow to move beyond simulation.
+- **QR Code Rendering:** While hashing and verification URLs are functional, QR image embedding in the `fpdf2` layout is temporarily disabled for testing focus and needs to be re-enabled.
+- **Ops Hardening:** Part 9 tasks (Rate limiting, structured logging) are necessary before any public-facing beta deployment.
+
+---
 
 **What is already working today:**
 - FastAPI boots locally and exposes `/api/v1/health` and agreement CRUD when the DB schema matches the ORM.
