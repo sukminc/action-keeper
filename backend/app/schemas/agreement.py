@@ -33,6 +33,11 @@ class AgreementAccept(BaseModel):
     accepter_label: str
 
 
+class AgreementDecline(BaseModel):
+    decliner_label: str
+    reason: Optional[str] = None
+
+
 class AgreementArtifactRead(BaseModel):
     verification_url: str
     hash_snapshot: str

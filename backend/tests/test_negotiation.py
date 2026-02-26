@@ -46,22 +46,64 @@ def test_negotiation_counter_and_accept(client):
     # Verify structured fields were updated
     assert countered["stake_percent"] == 40.0
 
-    # 3. Accept the counter
+    # 3. First acceptance moves to awaiting_confirmation
     accept_payload = {
         "accepter_label": "Player A",
     }
     r = client.post(f"/api/v1/agreements/{agreement_id}/accept", json=accept_payload)
     assert r.status_code == 200
+    first_accept = r.json()
+    assert first_accept["negotiation_state"] == "awaiting_confirmation"
+    assert first_accept["status"] == "draft"
+    assert first_accept["terms"]["stake_pct"] == 40
+    assert first_accept["party_a_confirmed_at"] is not None
+
+    # 4. Second acceptance finalizes the agreement
+    r = client.post(
+        f"/api/v1/agreements/{agreement_id}/accept",
+        json={"accepter_label": "Backer B"},
+    )
+    assert r.status_code == 200
     accepted = r.json()
     assert accepted["negotiation_state"] == "accepted"
     assert accepted["status"] == "active"
-    assert accepted["terms"]["stake_pct"] == 40
-    assert accepted["party_a_confirmed_at"] is not None
+    assert accepted["party_b_confirmed_at"] is not None
     assert accepted["hash"] != agreement["hash"]
 
-    # 4. Check events
+    # 5. Check events
     r = client.get(f"/api/v1/agreements/{agreement_id}/events")
     events = r.json()
     event_types = [e["event_type"] for e in events]
     assert "negotiation_countered" in event_types
     assert "agreement_accepted" in event_types
+
+
+def test_negotiation_decline(client):
+    payment_id = _paid_payment(client)
+    payload = {
+        "agreement_type": "poker_staking",
+        "terms_version": "v1",
+        "terms": {"buy_in": 100, "stake_pct": 50},
+        "payment_id": payment_id,
+        "proposer_label": "Player A",
+        "party_a_label": "Player A",
+        "party_b_label": "Backer B",
+    }
+    r = client.post("/api/v1/agreements", json=payload)
+    assert r.status_code == 201
+    agreement_id = r.json()["id"]
+
+    decline_resp = client.post(
+        f"/api/v1/agreements/{agreement_id}/decline",
+        json={"decliner_label": "Backer B", "reason": "Too much markup"},
+    )
+    assert decline_resp.status_code == 200
+    declined = decline_resp.json()
+    assert declined["negotiation_state"] == "declined"
+    assert declined["status"] == "cancelled"
+
+    accept_after_decline = client.post(
+        f"/api/v1/agreements/{agreement_id}/accept",
+        json={"accepter_label": "Player A"},
+    )
+    assert accept_after_decline.status_code == 404

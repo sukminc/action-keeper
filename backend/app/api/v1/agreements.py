@@ -9,7 +9,13 @@ from fastapi.responses import FileResponse
 from app.core.config import settings
 from app.core.container import get_agreements_service, get_events_repo
 from app.repositories.events_repo import EventsRepo
-from app.schemas.agreement import AgreementAccept, AgreementCounter, AgreementCreate, AgreementRead
+from app.schemas.agreement import (
+    AgreementAccept,
+    AgreementCounter,
+    AgreementCreate,
+    AgreementDecline,
+    AgreementRead,
+)
 from app.schemas.event import EventRead
 from app.services.agreements_service import AgreementsService
 from app.utils.hash_utils import HASH_VERSION, generate_verification_url
@@ -86,6 +92,21 @@ def accept_agreement(
         agreement = service.accept_agreement(agreement_id, data)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
+    return _serialize_agreement(service, agreement)
+
+
+@router.post("/{agreement_id}/decline", response_model=AgreementRead)
+def decline_agreement(
+    agreement_id: str,
+    data: AgreementDecline,
+    service: AgreementsService = Depends(get_agreements_service),
+):
+    try:
+        agreement = service.decline_agreement(agreement_id, data)
+    except ValueError as exc:
+        detail = str(exc)
+        status_code = 404 if "not found" in detail.lower() else 400
+        raise HTTPException(status_code=status_code, detail=detail)
     return _serialize_agreement(service, agreement)
 
 
