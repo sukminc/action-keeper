@@ -21,6 +21,7 @@ export default function ContractBuilder() {
   const [terms, setTerms] = useState(initialTerms);
   const [status, setStatus] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [createdAgreementId, setCreatedAgreementId] = useState<string | null>(null);
 
   const handleTermsChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
@@ -93,6 +94,7 @@ export default function ContractBuilder() {
         console.error("API Error:", data);
         throw new Error(data.detail || "Offer failed");
       }
+      setCreatedAgreementId(data.id);
       setStatus(`Offer ${data.id} queued. Share the link so ${terms.party_b_label || "your backer"} can respond.`);
       setTerms(initialTerms);
     } catch (err) {
@@ -191,6 +193,19 @@ export default function ContractBuilder() {
         {isSubmitting ? "Sending…" : "Send Offer to Backer (v2)"}
       </button>
       {status && <p className="status-text">{status}</p>}
+      {createdAgreementId && (
+        <div className="card secondary" style={{ padding: "0.9rem" }}>
+          <p className="card-title" style={{ fontSize: "1rem" }}>
+            Shared contract link
+          </p>
+          <p className="status-text" style={{ marginTop: "0.35rem" }}>
+            Open this same page on both devices to track status and complete agreement.
+          </p>
+          <a className="link" href={`/contract/${createdAgreementId}`}>
+            /contract/{createdAgreementId}
+          </a>
+        </div>
+      )}
     </section>
   );
 }

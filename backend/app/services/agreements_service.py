@@ -1,4 +1,5 @@
 import os
+from copy import deepcopy
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -199,6 +200,7 @@ class AgreementsService:
         if agreement.negotiation_state in {"accepted", "declined"}:
             raise ValueError("Cannot counter a finalized agreement")
 
+        previous_terms = deepcopy(agreement.terms or {})
         agreement.pending_terms = data.terms
         agreement.last_proposed_by = data.proposer_label
         agreement.negotiation_state = "countered"
@@ -226,9 +228,20 @@ class AgreementsService:
             payload={
                 "proposer": data.proposer_label,
                 "counter_notes": data.counter_notes,
+                "term_changes": self._diff_terms(previous_terms, data.terms),
             },
         )
         return agreement
+
+    def _diff_terms(self, old_terms: Dict[str, Any], new_terms: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+        keys = ["stake_pct", "markup", "buy_in_amount", "payout_basis", "bullet_cap"]
+        changes: Dict[str, Dict[str, Any]] = {}
+        for key in keys:
+            old_val = old_terms.get(key)
+            new_val = new_terms.get(key)
+            if old_val != new_val:
+                changes[key] = {"from": old_val, "to": new_val}
+        return changes
 
     def accept_agreement(self, agreement_id: str, data: AgreementAccept) -> Agreement:
         agreement = self.agreements_repo.get_by_id(agreement_id)

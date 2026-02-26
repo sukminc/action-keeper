@@ -227,6 +227,9 @@ export default function AgreementVault() {
             </div>
             <div className="vault-actions" style={{ flexDirection: "column", alignItems: "flex-start", gap: "0.75rem" }}>
               <div className="pill-row" style={{ width: "100%" }}>
+                <a className="link" href={`/contract/${agreement.id}`} style={{ alignSelf: "center" }}>
+                  Open Shared Contract
+                </a>
                 {agreement.negotiation_state !== "accepted" && agreement.negotiation_state !== "declined" && (
                   <>
                     <button
