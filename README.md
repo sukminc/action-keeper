@@ -1,240 +1,143 @@
 # ActionKeeper
 
-Mobile-first **poker staking agreement** app focused on **revenue-first MVP**:
-- Generate a staking agreement (structured terms)
-- Produce a **tamper-evident** receipt (hash + QR verify)
-- Monetize via **paid contract generation** (Stripe) and later add Trip Planner + affiliate
+Structured agreement workflow for trust-heavy decisions.
 
-## Product Positioning
-ActionKeeper is **DocuSign for poker staking**, built for players and backers who need:
-- fast agreement drafting before play starts
-- transparent negotiation history
-- verifiable receipt after both sides confirm
+ActionKeeper began as a poker staking product, but the engineering value of the repo is broader: it shows how I model offers, counters, confirmations, artifacts, and audit trails in a workflow where trust matters and the final state must be explicit.
 
-The app is **free to install/use at entry level**, and monetizes agreement generation and workflow scale.
+## Product Idea
 
-## MVP Scope (Phase 1: Poker Staking)
-**Primary feature:** Paid contract generation + verification  
-**Non-custodial:** ActionKeeper never holds funds; it standardizes agreements and provides proof artifacts.
+The core flow is:
 
-### Negotiation Safeguards (New Requirements)
-- Every agreement starts as a **shared draft** that can be viewed via link or QR, but it is *not binding* until both parties acknowledge identical payout terms.
-- The database must persist each revision (e.g., “10% of total payout” vs. “10% of net profit”) and clearly mark who proposed it and when they confirmed.
-- Counter-offers stay visible side-by-side so user A and user B can converge without confusion; ActionKeeper only generates the final receipt after both select the same option.
-- Receipts must embed the canonical promise text, due date/event date, stake percentage, bullet cap, and payout basis so future disputes (like dilution on multi-bullet entries) can be resolved instantly.
+1. One side creates an offer
+2. The other side reviews it
+3. Both sides can counter, accept, or decline
+4. Once both agree on the same terms, the system generates a tamper-evident artifact
 
-Planned features by phase:
-- Phase 1 (Revenue MVP): Contract Builder → Pay → PDF + Hash + QR Verify → Vault/List
-- Phase 2: Trip Planner (budget + required % sale) + affiliate links
-- Phase 3: Verified Resume (optional, later)
+The current implementation is still domain-specific, but the technical pattern is useful well beyond poker:
 
-## Monetization Strategy (Future-Proof)
-Aligned with [VISION.md](VISION.md): revenue first, proof first, non-custodial.
+- negotiation state
+- versioned terms
+- append-only event history
+- artifact generation
+- verification flow
 
-### Packaging
-- `Free`: install + limited contract creation + shared negotiation link
-- `Pay-per-contract`: one-off fee per finalized agreement/receipt (best for casual users)
-- `Pro Unlimited`: monthly/annual unlimited contracts + advanced logs/export
-- `Team/Stable`: multi-seat plan for coaches/stables/backing groups with admin analytics
+## What Is Implemented
 
-### Unit Economics Direction
-- Charge on value moment: **when agreement is finalized and receipt is generated**
-- Keep negotiation drafting friction low to maximize completion rate
-- Add optional add-ons later: priority support, compliance export, anchored proof tiers
+- FastAPI backend with agreement, revision, payment, event, and artifact models
+- Next.js frontend with seller, buyer, and shared contract-room flows
+- append-only revision history for negotiations
+- agreement hashing and verification URLs
+- PDF artifact generation
+- simulated payment scaffolding
+- mobile-first UI for creating and reviewing offers
 
-### Anti-Commoditization
-- Structured poker-specific terms (stake %, markup, bullet cap, payout basis)
-- Revision timeline + dual-confirmation audit trail
-- Receipt evidence package designed for poker dispute contexts
+## Why This Repo Matters
 
-## Tech Stack
-- Frontend: Next.js (App Router), mobile-first web
-- Backend: FastAPI
-- DB: Postgres
-- Local Dev: Docker Compose monorepo
+This is one of the better examples in my portfolio of product engineering with real workflow complexity:
 
-## Running Locally (Current Testing Flow)
-1. Ensure Docker Desktop (or another Docker engine) is running; Compose cannot download Postgres without it.
-2. `cp .env.example .env` and set:
-   - `NEXT_PUBLIC_API_URL=http://localhost:8000`
-   - `VERIFY_BASE_URL=http://localhost:8000`
-   - `STRIPE_WEBHOOK_SECRET=<random-test-secret>`
-   - `API_TOKEN=dev-token`
-   - optional: `ARTIFACTS_DIR=artifacts`, `RATE_LIMIT_PER_MINUTE=200`
-3. Apply migrations once before bringing up the stack (this prevents the `agreements.payment_id does not exist` error):
-   ```bash
-   # If you changed DB credentials and see "password authentication failed",
-   # remove the old volume first:
-   docker compose down
-   docker volume rm action-keeper_postgres_data
-   docker compose up -d db
-   docker compose run --rm backend alembic upgrade head
-   ```
-4. Start the full stack and rebuild images when backend code changes:
-   ```bash
-   docker compose up --build db backend frontend
-   ```
-   Watch `docker compose logs backend` for a clean "Application startup complete" message; migration failures (missing `script_location`) mean the container was launched before the latest code—rebuild and retry.
-5. Frontend dev server tasks (linting, `npm run dev`, etc.) must run from `frontend/`; running them at the repo root triggers `ENOENT` for `package.json`.
-6. Manual smoke test loop while Docker is up:
-   - `curl http://localhost:8000/api/v1/health`
-   - `POST /api/v1/payments/checkout` with `Authorization: Bearer dev-token`
-   - `POST /api/v1/payments/webhook` with `X-Webhook-Secret`
-   - `POST /api/v1/agreements` supplying the paid `payment_id`
-   - `GET /api/v1/agreements` and `/api/v1/agreements/{id}/artifact`
-   Keep an eye on backend logs; 404s from the webhook or 402 responses from agreements indicate the payment flow is still being wired up.
+- business rules live in a service layer
+- state transitions are explicit
+- the user flow is more than CRUD
+- the system preserves auditability as terms change
 
-### 2026-02-26 Snapshot
-- **Negotiation Workflow:** Fully implemented shared contract room supporting turn-based `Accept / Counter / Decline` logic. Supports dual-confirmation, visual diffs of term changes, and a persistent activity feed/audit trail.
-- **Infrastructure & Reliability:** 
-  - Implemented **Next.js Rewrite Proxy** (`/api/*` -> `backend:8000`) to eliminate CORS issues and simplify frontend-backend connectivity.
-  - Upgraded amount columns to `BigInteger` for high-stakes support.
-  - Stabilized Alembic migrations up to `v3_negotiation`.
-- **Frontend Refinement:** 
-  - Polished Seller/Buyer interfaces for poker-specific terminology (stake %, bullet caps, markup).
-  - Real-time payout scenario previews in the Contract Room.
-- **Artifacts:** Successfully transitioned to `fpdf2` for deterministic PDF generation. 
+## Architecture
 
----
+### Frontend
 
-## Current Progress
+The Next.js app provides:
 
-**Status as of today (2026-02-26):**
+- landing page
+- seller flow
+- buyer flow
+- shared contract room
+- agreement vault
 
-| Part | Status | Notes |
-| --- | --- | --- |
-| 1 — Foundation | ✅ Stable | Monorepo + health check verified locally. |
-| 2 — Domain Models | ✅ Stable | Agreements/events repositories pass unit tests. |
-| 3 — Service Layer | ✅ Stable | Business rules + event emission implemented. |
-| 4 — API Contracts | ✅ Stable | CRUD + Negotiation endpoints (Accept/Counter) live. |
-| 5 — Tamper-Evident Receipt | ✅ Stable | SHA-256 hashing + public verification logic implemented. |
-| 6 — PDF Artifact Generation | ✅ Stable | Transitioned to `fpdf2`; deterministic PDFs stored in `ARTIFACTS_DIR`. |
-| 7 — Payments (Revenue MVP) | ⚠️ Partial | Stripe scaffolding (Checkout/Webhooks) exists but uses simulated session IDs. |
-| 8 — Mobile Contract Builder | ✅ Stable | Functional Seller/Buyer mobile UI with negotiation flow. |
-| 9 — Audit & Ops | 🚧 Not started | Rate limiting, structured logging, auth hardening queued. |
-| 10 — Expansion Hooks | 🚧 In Progress | Trip Planner scaffolding and basic budget logic implemented. |
+Important files:
 
-## Current Blockers & Gaps
-- **Authentication:** The system currently relies on a hardcoded `dev-token`. Integration of a real identity provider (e.g., NextAuth, Firebase, or Clerk) is required for production.
-- **Production Payments:** Stripe integration requires real API keys and a production-grade checkout flow to move beyond simulation.
-- **QR Code Rendering:** While hashing and verification URLs are functional, QR image embedding in the `fpdf2` layout is temporarily disabled for testing focus and needs to be re-enabled.
-- **Ops Hardening:** Part 9 tasks (Rate limiting, structured logging) are necessary before any public-facing beta deployment.
+- [frontend/src/app/page.tsx](/Users/chrisyoon/GitHub/one-percent-better-poker-staking/frontend/src/app/page.tsx)
+- [frontend/src/app/sections/ContractBuilder.tsx](/Users/chrisyoon/GitHub/one-percent-better-poker-staking/frontend/src/app/sections/ContractBuilder.tsx)
+- [frontend/src/app/sections/ContractRoom.tsx](/Users/chrisyoon/GitHub/one-percent-better-poker-staking/frontend/src/app/sections/ContractRoom.tsx)
 
----
+### Backend
 
-**What is already working today:**
-- FastAPI boots locally and exposes `/api/v1/health` and agreement CRUD when the DB schema matches the ORM.
-- Alembic assets (`backend/alembic`) exist; running `alembic upgrade head` inside the backend container unblocks payment/receipt experiments.
-- Deterministic PDFs and verification URLs are generated on the backend; embedding an actual QR image plus negotiation metadata is a known follow-up.
-- Docker Compose remains the canonical way to stand up Postgres + API + Next.js for manual testing.
+The FastAPI backend handles:
 
----
+- agreement creation
+- counter-offers
+- confirmation flow
+- event logging
+- payment gating
+- artifact generation
+- verification
 
-## Roadmap: Parts 1–10 (TDD-Gated)
+Important files:
 
-Each part must pass **unit tests → quick QA → integration tests** before moving forward.
+- [backend/app/main.py](/Users/chrisyoon/GitHub/one-percent-better-poker-staking/backend/app/main.py)
+- [backend/app/services/agreements_service.py](/Users/chrisyoon/GitHub/one-percent-better-poker-staking/backend/app/services/agreements_service.py)
+- [backend/app/services/payments_service.py](/Users/chrisyoon/GitHub/one-percent-better-poker-staking/backend/app/services/payments_service.py)
+- [backend/app/artifacts/pdf_renderer.py](/Users/chrisyoon/GitHub/one-percent-better-poker-staking/backend/app/artifacts/pdf_renderer.py)
 
-### Part 1 — Project Foundation (Baseline) ✅
-- Repository structure (monorepo)
-- Docker Compose (frontend, backend, DB)
-- Health check endpoint (`/api/v1/health`)
-- CI-ready test setup (pytest, basic fixtures)
+## Repo Structure
 
-**Outcome:** System boots locally and is observable.
+```text
+one-percent-better-poker-staking/
+├── backend/
+│   ├── app/
+│   ├── alembic/
+│   └── tests/
+├── frontend/
+│   └── src/app/
+├── docker-compose.yml
+├── VISION.md
+└── README.md
+```
 
----
+## Running Locally
 
-### Part 2 — Core Domain Models & Repositories ✅
-- Agreement domain model
-- Event (audit log) domain model
-- Repository layer (CRUD, append-only events)
-- SQLite-safe types for testing, Postgres-ready for prod
+### Backend and database
 
-**Outcome:** Domain persistence works and is fully unit-tested.
+```bash
+docker compose up --build db backend
+```
 
----
+### Frontend
 
-### Part 3 — Service Layer (Business Rules) ✅
-- Agreement creation service
-- Default rules (status, versions, timestamps)
-- Event emission on state changes
-- Validation beyond schemas (domain-level)
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-**Outcome:** Business logic isolated and testable.
+### Health check
 
----
+```bash
+curl http://localhost:8000/api/v1/health
+```
 
-### Part 4 — API Contracts (Agreements) ✅
-- Create agreement endpoint
-- List / retrieve agreement endpoints
-- Request/response schemas stabilized
-- Error handling + HTTP semantics
+## Current Status
 
-**Outcome:** Frontend can create and read agreements via API.
+This is an active product build, not a finished commercial release.
 
----
+What is strong today:
 
-### Part 5 — Tamper-Evident Receipt ✅
-- Deterministic agreement hashing
-- Hash persistence + verification logic
-- Public verify endpoint (read-only)
-- QR payload structure defined
+- domain model
+- negotiation flow
+- event and revision tracking
+- artifact generation
+- service-layer organization
 
-**Outcome:** Agreements are cryptographically verifiable.
+What is still incomplete:
 
----
+- production-grade auth
+- real payment integration
+- operational hardening
+- broader non-poker abstraction
 
-### Part 6 — PDF Artifact Generation ✅
-- Agreement → PDF rendering
-- Embed hash + verification URL
-- Deterministic layout for consistency
-- Store artifact metadata + download endpoint
+## Hiring Signal
 
-**Outcome:** Shareable, receipt-like contract artifact exists.
+I would not point to this repo as a generic SaaS clone. I would point to it as evidence that I can handle:
 
----
-
-### Part 7 — Payments (Revenue MVP) ✅
-- Stripe-style Checkout session scaffolding
-- Paid contract generation gate enforced by `payment_id`
-- Webhook handling (idempotent secret validation)
-- Payment → agreement linkage surfaced via APIs
-
-**Outcome:** App generates real revenue.
-
----
-
-### Part 8 — Frontend Contract Builder (Mobile-First)
-- Agreement input flow (mobile UX)
-- Payment flow integration
-- Contract list / vault view
-- QR scan / verify entry points
-
-**Outcome:** End-to-end user flow is usable on phone.
-
----
-
-### Part 9 — Audit, Hardening, and Ops
-- Event timeline view (per agreement)
-- Rate limiting & basic auth hardening
-- Structured logging
-- Config separation (dev / prod)
-
-**Outcome:** Production-readiness baseline.
-
----
-
-### Part 10 — Expansion Hooks
-- Trip Planner domain scaffolding
-- Affiliate link placeholders
-- Generic “agreement” abstraction (non-poker reuse)
-- Migration readiness (Alembic)
-
-**Outcome:** Platform is extensible beyond poker staking.
-
----
-
-**Monetization Checkpoint:**  
-Revenue must be observable by **Part 7**.  
-All later parts must not break paid contract generation.
----
+- messy product state
+- workflow-heavy backend logic
+- user trust problems
+- full-stack iteration across API, persistence, and UI
