@@ -1,36 +1,45 @@
 # CLAUDE.md — ActionKeeper
 
-## Brand Hub
-**onepercentbetter.poker** — this project is listed there as `ActionKeeper`.
-If it's removed from the site, it's no longer a brand asset.
-Owner: Chris S. Yoon · github.com/sukminc
+## Repo Role
 
-## What this is
-Full-stack agreement & negotiation platform. Tamper-evident staking/deal agreements with dual-confirmation workflow.
-Status: `building` (40% MVP)
-Slug on hub: `actionkeeper` · Repo: `sukminc/action-keeper`
+Poker workflow product for staking and agreement management.
 
-## Core Value
-Poker context: formalize staking agreements, track action, prevent disputes.
-General context: any high-stakes two-party agreement with audit trail needs.
+This repo is part of the poker vertical, but it should stay grounded in what the repo actually demonstrates today:
 
-## Stack
-- Backend: FastAPI + PostgreSQL (Clean Architecture — Service/Repository layers)
-- Frontend: Next.js + TypeScript
-- Infrastructure: Docker, Stripe (payments)
-- SHA-256 receipt hashing, full persistent audit trail
+- structured offers and counters
+- explicit agreement state transitions
+- event history
+- artifact generation
+- trust-heavy workflow design
 
-## Key Architecture
-- Clean Architecture: Service layer → Repository layer → DB
-- Dual-confirmation negotiation engine (Accept / Counter / Decline)
-- Turn-based workflow with visual term diffs + side-by-side counter-offer comparison
-- Tamper-evident hashing on every agreement record
+## Repo Identity
+
+- Repo: `sukminc/one-percent-better-poker-staking`
+- Landing slug: `actionkeeper`
+- Vertical: poker
+
+## Guardrails
+
+- Keep the repo framed as a workflow product with a real poker use case.
+- Do not oversell it as a generic platform before the current flow is tighter.
+- Do not let the marketing story outrun the implementation.
+- Preserve auditability and explicit state changes as the main engineering signal.
+
+## Current Truth
+
+Trust `README.md` for implemented scope.
+
+What matters most:
+
+- FastAPI backend
+- Next.js frontend
+- revision history
+- PDF artifacts
+- negotiation engine
 
 ## Commands
-```bash
-# Backend
-cd backend && uvicorn app.main:app --reload
 
-# Frontend
+```bash
+cd backend && uvicorn app.main:app --reload
 cd frontend && npm run dev
 ```

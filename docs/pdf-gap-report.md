@@ -2,7 +2,7 @@
 
 ## Overview
 - **Date:** February 25, 2026
-- **Inputs:** `/Users/chrisyoon/GitHub/action-keeper/output/pdf/actionkeeper-app-summary.pdf` vs repo `f9560815634d5a56b3a39498cb24b6ec71a75760`
+- **Inputs:** `/Users/chrisyoon/GitHub/one-percent-better-poker-staking/output/pdf/actionkeeper-app-summary.pdf` vs repo `f9560815634d5a56b3a39498cb24b6ec71a75760`
 - **Method:** The environment cannot reach PyPI (pip install of `pdfplumber`/`pypdf` failed), so a custom parser extracted every text operator from the PDF content stream to keep the comparison machine-verifiable.
 
 ## Legend
