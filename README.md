@@ -2,7 +2,15 @@
 
 Structured agreement workflow for trust-heavy decisions.
 
-ActionKeeper began as a poker staking product, but the engineering value of the repo is broader: it shows how I model offers, counters, confirmations, artifacts, and audit trails in a workflow where trust matters and the final state must be explicit.
+ActionKeeper is currently a secondary poker workflow repo.
+
+It began as a poker staking product, but the engineering value of the repo is broader: it shows how I model offers, counters, confirmations, artifacts, and audit trails in a workflow where trust matters and the final state must be explicit.
+
+This week, its role is simple:
+
+- stay legible
+- stay aligned with the poker lane
+- do not compete with `Exploit Better` for front-door priority
 
 ## Product Idea
 
@@ -116,7 +124,7 @@ curl http://localhost:8000/api/v1/health
 
 ## Current Status
 
-This is an active product build, not a finished commercial release.
+This is a real proof-of-work repo, not the primary poker push.
 
 What is strong today:
 

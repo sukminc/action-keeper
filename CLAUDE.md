@@ -4,6 +4,8 @@
 
 Poker workflow product for staking and agreement management.
 
+Current weekly posture: `hold`.
+
 This repo is part of the poker vertical, but it should stay grounded in what the repo actually demonstrates today:
 
 - structured offers and counters
@@ -23,6 +25,7 @@ This repo is part of the poker vertical, but it should stay grounded in what the
 - Keep the repo framed as a workflow product with a real poker use case.
 - Do not oversell it as a generic platform before the current flow is tighter.
 - Do not let the marketing story outrun the implementation.
+- Do not let this repo compete with `Exploit Better` for the main poker story this week.
 - Preserve auditability and explicit state changes as the main engineering signal.
 
 ## Current Truth
